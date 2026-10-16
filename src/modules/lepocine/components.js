@@ -6,18 +6,12 @@ import cfg from './config.js';
 import * as repo from './repo.js';
 import * as service from './service.js';
 import { resolveStart } from './time.js';
+import { isStaff } from '../../core/permissions.js';
 
 const eph = { flags: MessageFlags.Ephemeral };
 const esc = (s) => escapeMarkdown(String(s));
 const clean = (s, max) => s.replace(/\s+/g, ' ').trim().slice(0, max);
 const DENIED = { content: 'Solo el equipo puede hacer esto.', ...eph };
-
-function isStaff(interaction) {
-  const roles = interaction.member?.roles;
-  if (!roles) return false;
-  const has = (id) => (Array.isArray(roles) ? roles.includes(id) : roles.cache.has(id));
-  return cfg.staffRoleIds.some(has);
-}
 
 const textRow = (input) => new ActionRowBuilder().addComponents(input);
 

@@ -15,7 +15,7 @@ async function execute(interaction) {
 
   const staff = await service.repostStaffPanel(interaction.client);
   if (!staff) {
-    return interaction.editReply('No encuentro el canal del equipo. Revisá `staffChannelId` en `config.js` y los permisos del bot.');
+    return interaction.editReply('No encuentro el canal del equipo. Revisá `staffChannelId` en `src/core/config.js` y los permisos del bot.');
   }
   return interaction.editReply(`Panel publicado en ${staff}.`);
 }

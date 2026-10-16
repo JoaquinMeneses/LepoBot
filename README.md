@@ -4,13 +4,13 @@ Bot de Discord para las actividades de la comunidad: cumpleaños y organización
 
 ## Módulos
 
-| Módulo        | Estado          | Descripción                                                                     |
-| ------------- | --------------- | ------------------------------------------------------------------------------- |
-| `birthdays`   | Disponible      | Registro de cumpleaños y saludo automático diario                               |
-| `lepocine`    | Disponible      | Película de la comunidad: encuesta de sugerencias, elección y evento automático |
-| `debug`       | Solo desarrollo | Comandos de prueba; todos usan el prefijo `lc-debug-`                           |
-| `tournaments` | Planeado        | Torneos internos de LoL                                                         |
-| `copypastas`  | Planeado        | Copypastas de la comunidad                                                      |
+| Módulo        | Estado          | Descripción                                                                      |
+| ------------- | --------------- | -------------------------------------------------------------------------------- |
+| `birthdays`   | Disponible      | Registro de cumpleaños y saludo automático diario                                |
+| `lepocine`    | Disponible      | Película de la comunidad: encuesta de sugerencias, elección y evento automático  |
+| `copypastas`  | Disponible      | Copia al canal de copypastas los mensajes marcados con un emoji y los deja votar |
+| `debug`       | Solo desarrollo | Comandos de prueba; todos usan el prefijo `lc-debug-`                            |
+| `tournaments` | Planeado        | Torneos internos de LoL                                                          |
 
 ### Cumpleaños
 
@@ -46,16 +46,14 @@ La comunidad ve películas juntos. Todo se maneja con paneles de botones, sin co
 
 Los roles se verifican siempre al hacer clic: aunque todos vean los botones del panel del equipo, solo los roles configurados pueden usarlos.
 
-| Comando           | Descripción                                                          |
-| ----------------- | -------------------------------------------------------------------- |
+| Comando              | Descripción                                                          |
+| -------------------- | -------------------------------------------------------------------- |
 | `/lc-lepocine panel` | Publica de nuevo el panel del equipo (requiere _Gestionar servidor_) |
 
-**Configuración** (`src/modules/lepocine/config.js`):
+**Configuración** (`src/modules/lepocine/config.js`). El canal y los roles del equipo son globales y se configuran en `src/core/config.js` (ver _Configuración global_):
 
 | Opción                        | Descripción                                                |
 | ----------------------------- | ---------------------------------------------------------- |
-| `staffChannelId`              | Canal del equipo                                           |
-| `staffRoleIds`                | Roles que pueden abrir la encuesta y elegir la película    |
 | `location`                    | Ubicación (texto) del evento                               |
 | `defaultDay` / `defaultTime`  | Valores precargados en el formulario                       |
 | `durationMinutes`             | Duración del evento (por defecto 165 = 2 h 45 min)         |
@@ -66,6 +64,30 @@ El canal público se define con `LEPOCINE_CHANNEL_ID` en el `.env`. Si preferís
 
 **Permisos del bot:** en ambos canales, _Ver canal_, _Enviar mensajes_ e _Insertar enlaces_; en el servidor, _Crear eventos_ y _Gestionar eventos_. Para que las menciones a los roles notifiquen, los roles deben ser mencionables o el bot necesita el permiso de mencionar roles.
 
+### Copypastas
+
+Los mensajes que la comunidad marca con un emoji se copian a un canal de copypastas, donde se pueden votar.
+
+1. Alguien reacciona a un mensaje con el emoji configurado (por defecto 📋).
+2. El bot copia el mensaje al canal de copypastas: texto, autor, enlace al mensaje original y hasta 4 archivos adjuntos (8 MB en total).
+3. A cada copia le agrega dos reacciones para votar: ✅ (a favor) y ❌ (en contra). Los contadores de Discord muestran qué piensa la gente. Se pueden cambiar en `src/modules/copypastas/config.js`.
+
+Un mismo mensaje se copia una sola vez, aunque lo reaccione más gente. Se ignoran los mensajes de bots, los que ya están en el canal de copypastas y las reacciones de bots.
+
+**Panel de configuración:** `/lc-copypastas panel` (requiere _Gestionar servidor_) publica en el canal del equipo un panel con tres botones. Solo los roles del equipo (`staffRoleIds` global) pueden usarlos:
+
+| Botón                    | Qué configura                                                                                             |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- |
+| **Cambiar emoji**        | El emoji que activa la copia. Acepta un emoji común, uno personalizado del servidor (`:nombre:`) o pegado |
+| **Cambiar canal**        | El canal de destino, con un selector de canales. Avisa si al bot le faltan permisos                       |
+| **Mínimo de reacciones** | Cuántas reacciones con ese emoji hacen falta (por defecto 1, máximo 20)                                   |
+
+Lo que se configura desde el panel se guarda en la base de datos y tiene prioridad sobre los valores por defecto de `src/modules/copypastas/config.js`.
+
+**Permisos del bot:** en el canal de copypastas, _Ver canal_, _Enviar mensajes_, _Insertar enlaces_, _Adjuntar archivos_ y _Añadir reacciones_ (más _Usar emojis externos_ si los emojis de votación son de otro servidor). Además, el bot necesita ver los mensajes que se reaccionan: _Ver canal_ y _Leer el historial de mensajes_ en esos canales.
+
+**Intent privilegiado:** para leer el texto de los mensajes reaccionados, el bot necesita el **Message Content Intent**. Hay que activarlo en el Developer Portal (pestaña **Bot** → _Privileged Gateway Intents_). Sin eso, el bot no arranca (`Used disallowed intents`) o copia mensajes vacíos.
+
 ## Stack
 
 - [Node.js](https://nodejs.org) **22.13 o superior**
@@ -74,14 +96,27 @@ El canal público se define con `LEPOCINE_CHANNEL_ID` en el `.env`. Si preferís
 - [node-cron](https://github.com/node-cron/node-cron) para las tareas programadas
 - Proyecto nativo ES modules (`"type": "module"`); `.env` se carga con `process.loadEnvFile()` sin dotenv
 
+## Configuración global
+
+Lo que comparten todos los módulos vive en `src/core/config.js`:
+
+| Opción           | Descripción                                                                                     |
+| ---------------- | ----------------------------------------------------------------------------------------------- |
+| `TZ`             | Zona horaria (se toma de `TIMEZONE` en el `.env`; por defecto `America/Argentina/Buenos_Aires`) |
+| `staffChannelId` | Canal del equipo, donde viven los paneles de administración                                     |
+| `staffRoleIds`   | Roles con permisos de administración sobre los paneles de todos los módulos                     |
+
+Para comprobar si alguien es del equipo, los módulos usan `isStaff(interaction)` de `src/core/permissions.js`, que lee `staffRoleIds`. Cada módulo conserva su propio `config.js` con sus opciones.
+
 ## Puesta en marcha
 
 ### 1. Crear la aplicación en Discord
 
 1. Entrá al [Developer Portal](https://discord.com/developers/applications) y creá una aplicación.
 2. En la pestaña **Bot**, usá **Reset Token** y copiá el token (se muestra una sola vez).
-3. En **OAuth2 → URL Generator**, marcá los scopes `bot` y `applications.commands` y los permisos indicados arriba.
-4. Abrí la URL generada e invitá el bot a tu servidor.
+3. En la misma pestaña **Bot**, en _Privileged Gateway Intents_, activá **Message Content Intent** (lo necesita el módulo de copypastas para leer los mensajes).
+4. En **OAuth2 → URL Generator**, marcá los scopes `bot` y `applications.commands` y los permisos indicados en cada módulo.
+5. Abrí la URL generada e invitá el bot a tu servidor.
 
 ### 2. Configurar el proyecto
 
@@ -117,14 +152,25 @@ src/
 ├── index.js                  # Cliente de Discord y despacho de interacciones
 ├── core/
 │   ├── env.js                # Carga del .env
+│   ├── config.js             # Configuración global (zona horaria, canal y roles del equipo)
+│   ├── permissions.js        # isStaff(): permisos de los paneles
 │   ├── db.js                 # Conexión SQLite y tablas del core
 │   ├── loader.js             # Carga automática de módulos
 │   └── deploy-commands.js    # Registro de slash commands
 └── modules/
     ├── birthdays/            # Cumpleaños
+    ├── copypastas/
+    │   ├── index.js          # Definición del módulo
+    │   ├── config.js         # Emoji, canal y votos por defecto
+    │   ├── emoji.js          # Interpretación y comparación de emojis
+    │   ├── repo.js           # Tablas y acceso a datos
+    │   ├── service.js        # Panel y copia de mensajes
+    │   ├── events.js         # Escucha de reacciones
+    │   ├── components.js     # Botones, formularios y selector de canal
+    │   └── command.js        # /lc-copypastas
     ├── lepocine/
     │   ├── index.js          # Definición del módulo
-    │   ├── config.js         # Canales, roles y horarios
+    │   ├── config.js         # Canal público, evento y horarios
     │   ├── time.js           # Interpretación de día/hora y zona horaria
     │   ├── repo.js           # Tablas y acceso a datos
     │   ├── service.js        # Paneles, evento y avisos
@@ -145,9 +191,9 @@ El loader detecta automáticamente cada carpeta dentro de `src/modules/`. Para c
 
 ```js
 export default {
-  name: 'mi-modulo',
+  name: "mi-modulo",
   commands: [{ data: commandData, execute: async (interaction) => {} }],
-  components: [{ prefix: 'mi-modulo', handle: async (interaction) => {} }], // opcional: botones, selects y formularios cuyo customId empiece con "mi-modulo:"
+  components: [{ prefix: "mi-modulo", handle: async (interaction) => {} }], // opcional: botones, selects y formularios cuyo customId empiece con "mi-modulo:"
   init: (client) => {}, // opcional: tareas programadas, listeners, etc.
 };
 ```
@@ -161,19 +207,19 @@ Convenciones del proyecto:
 
 ## Comandos de prueba (`debug`)
 
-| Comando            | Descripción                                      |
-| ------------------ | ------------------------------------------------ |
-| `/lc-hola`                | Responde un saludo de prueba                     |
-| `/lc-debug-anunciar`      | Fuerza el saludo de cumpleaños de hoy            |
-| `/lc-debug-lunes`         | Simula el aviso del lunes de Lepocine            |
-| `/lc-debug-aviso`         | Fuerza el recordatorio diario de elegir película |
-| `/lc-debug-reiniciar`     | Borra la última encuesta de Lepocine y su evento |
+| Comando               | Descripción                                      |
+| --------------------- | ------------------------------------------------ |
+| `/lc-hola`            | Responde un saludo de prueba                     |
+| `/lc-debug-anunciar`  | Fuerza el saludo de cumpleaños de hoy            |
+| `/lc-debug-lunes`     | Simula el aviso del lunes de Lepocine            |
+| `/lc-debug-aviso`     | Fuerza el recordatorio diario de elegir película |
+| `/lc-debug-reiniciar` | Borra la última encuesta de Lepocine y su evento |
 
 ## Hoja de ruta
 
 - [ ] **Torneos internos de LoL**: inscripción, armado de equipos o brackets y seguimiento de resultados
-- [ ] **Copypastas**: guardar, buscar y lanzar copypastas de la comunidad
 - [ ] Saludos de cumpleaños perdidos: recuperar el saludo si el bot estuvo caído a las 9:00
+
 ## Despliegue
 
 El bot necesita un proceso Node.js en ejecución permanente y un entorno con Node.js 22.13 o superior. Configurá las variables necesarias y ejecutá `npm run deploy` una vez (y cada vez que cambien los comandos). En producción, usá las credenciales de la aplicación Discord de producción.

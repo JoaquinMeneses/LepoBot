@@ -1,4 +1,6 @@
-const TZ = process.env.TIMEZONE || 'America/Argentina/Buenos_Aires';
+import config from '../../core/config.js';
+
+const TZ = config.TZ;
 
 const isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
 const daysInMonth = (m, y = 2000) => new Date(Date.UTC(y, m, 0)).getUTCDate(); // 2000 = bisiesto (permite 29/02)

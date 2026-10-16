@@ -4,10 +4,21 @@ import {
   GatewayIntentBits,
   Events,
   MessageFlags,
+  Partials,
 } from "discord.js";
 import { loadModules } from "./core/loader.js";
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    // Copypastas: reacciones y lectura del texto de los mensajes.
+    // MessageContent es un intent privilegiado: hay que activarlo en el Developer Portal.
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.MessageContent,
+  ],
+  // Permite recibir reacciones en mensajes que el bot no tiene en caché
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction],
+});
 
 await loadModules(client);
 

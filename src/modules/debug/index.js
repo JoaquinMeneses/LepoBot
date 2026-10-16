@@ -14,7 +14,7 @@ const adminCommand = (name, description) =>
     .setContexts(0);
 
 const NO_CHANNEL =
-  "No encuentro los canales de Lepocine. Revisá `LEPOCINE_CHANNEL_ID` en el `.env` y `staffChannelId` en `config.js`.";
+  "No encuentro los canales de Lepocine. Revisá `LEPOCINE_CHANNEL_ID` en el `.env` y `staffChannelId` en `src/core/config.js`.";
 
 const holaData = new SlashCommandBuilder()
   .setName("lc-hola")
@@ -64,10 +64,9 @@ const recordatorioData = adminCommand(
 
 async function executeLcDebugLepocineRecordatorio(interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const { status, channel } = await lepocine.dailyReminder(
-    interaction.client,
-    { force: true },
-  );
+  const { status, channel } = await lepocine.dailyReminder(interaction.client, {
+    force: true,
+  });
 
   const msg = {
     sent: `Recordatorio enviado en ${channel}.`,

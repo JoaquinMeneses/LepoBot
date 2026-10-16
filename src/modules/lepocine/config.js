@@ -1,13 +1,13 @@
+import globalConfig from '../../core/config.js';
+
 export default {
-  TZ: process.env.TIMEZONE || 'America/Argentina/Buenos_Aires',
+  // Compartido con todo el proyecto (src/core/config.js)
+  TZ: globalConfig.TZ,
+  staffChannelId: globalConfig.staffChannelId,
+  staffRoleIds: globalConfig.staffRoleIds,
 
   // Canal público: acá la comunidad sugiere películas
   channelId: process.env.LEPOCINE_CHANNEL_ID || '',
-  // Canal del equipo: acá llega el aviso del lunes, se abre la encuesta y se elige la película
-  staffChannelId: '1389406397023649896',
-  // Roles que pueden abrir la encuesta y elegir la película
-  staffRoleIds: ['1389406395572682790', '1389406395572682787'],
-
   // Dónde se hace el evento: canal de voz si se define, si no "ubicación externa" con texto
   voiceChannelId: process.env.LEPOCINE_VOICE_CHANNEL_ID || '',
   location: 'Lepore´s Club',
