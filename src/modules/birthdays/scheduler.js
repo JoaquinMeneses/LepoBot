@@ -23,7 +23,7 @@ async function announceToday(client) {
 }
 
 function start(client) {
-  const hour = Number(process.env.BIRTHDAY_HOUR ?? 9);
+  const hour = 9;
   cron.schedule(`0 ${hour} * * *`, () => announceToday(client), { timezone: TZ });
   console.log(`[cumples] saludos diarios a las ${hour}:00 (${TZ})`);
 }
