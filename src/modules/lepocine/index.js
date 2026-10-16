@@ -1,10 +1,10 @@
-const command = require('./command');
-const components = require('./components');
-const scheduler = require('./scheduler');
+import * as command from './command.js';
+import * as components from './components.js';
+import * as scheduler from './scheduler.js';
 
-module.exports = {
+export default {
   name: 'lepocine',
-  commands: [command],
+  commands: [{ data: command.data, execute: command.execute }],
   components: [{ prefix: 'lepocine', handle: components.handle }],
   init: (client) => scheduler.start(client),
 };

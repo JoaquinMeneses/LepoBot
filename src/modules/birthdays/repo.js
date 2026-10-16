@@ -1,4 +1,4 @@
-const db = require('../../core/db');
+import db from '../../core/db.js';
 
 const q = {
   upsert: db.prepare(`
@@ -14,7 +14,7 @@ const q = {
   channels: db.prepare('SELECT guild_id, birthday_channel_id FROM guild_settings WHERE birthday_channel_id IS NOT NULL'),
 };
 
-module.exports = {
+export default {
   set: (guildId, userId, day, month, year) => q.upsert.run({ guildId, userId, day, month, year: year ?? null }),
   get: (guildId, userId) => q.get.get(guildId, userId),
   remove: (guildId, userId) => q.del.run(guildId, userId).changes > 0,

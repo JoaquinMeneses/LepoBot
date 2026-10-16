@@ -1,8 +1,9 @@
-const command = require('./command');
-const scheduler = require('./scheduler');
+import * as command from './command.js';
+import * as scheduler from './scheduler.js';
 
-module.exports = {
+export default {
   name: 'birthdays',
-  commands: [command],
+  commands: [{ data: command.data, execute: command.execute }],
+  components: [{ prefix: 'lc-birthdays', handle: command.handle }],
   init: (client) => scheduler.start(client),
 };

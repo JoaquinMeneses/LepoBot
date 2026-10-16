@@ -1,10 +1,10 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
-const service = require('./service');
+import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } from 'discord.js';
+import * as service from './service.js';
 
 // Comando solo de administración: el equipo y la comunidad usan los botones de los paneles.
 // (Los comandos de prueba viven en el módulo `debug`.)
 const data = new SlashCommandBuilder()
-  .setName('lepocine')
+  .setName('lc-lepocine')
   .setDescription('Administración de Lepocine')
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .setContexts(0)
@@ -20,4 +20,4 @@ async function execute(interaction) {
   return interaction.editReply(`Panel publicado en ${staff}.`);
 }
 
-module.exports = { data, execute };
+export { data, execute };

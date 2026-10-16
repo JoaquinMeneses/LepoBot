@@ -1,6 +1,9 @@
-const fs = require("node:fs");
-const path = require("node:path");
-const { Collection } = require("discord.js");
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { Collection } from "discord.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Cada carpeta dentro de src/modules/ es un módulo y debe tener un index.js que exporte:
@@ -11,14 +14,14 @@ const { Collection } = require("discord.js");
  *     init?(client)
  *   }
  */
-function loadModules(client) {
+export async function loadModules(client) {
   client.commands = new Collection();
   client.components = [];
   const modulesDir = path.join(__dirname, "..", "modules");
 
   for (const entry of fs.readdirSync(modulesDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const mod = require(path.join(modulesDir, entry.name));
+    const { default: mod } = await import(pathToFileURL(path.join(modulesDir, entry.name, "index.js")));
 
     for (const cmd of mod.commands ?? []) {
       client.commands.set(cmd.data.name, cmd);
@@ -32,15 +35,13 @@ function loadModules(client) {
 }
 
 // Usado por deploy-commands (no necesita cliente)
-function collectCommandsJSON() {
+export async function collectCommandsJSON() {
   const modulesDir = path.join(__dirname, "..", "modules");
   const out = [];
   for (const entry of fs.readdirSync(modulesDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const mod = require(path.join(modulesDir, entry.name));
+    const { default: mod } = await import(pathToFileURL(path.join(modulesDir, entry.name, "index.js")));
     for (const cmd of mod.commands ?? []) out.push(cmd.data.toJSON());
   }
   return out;
 }
-
-module.exports = { loadModules, collectCommandsJSON };

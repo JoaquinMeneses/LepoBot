@@ -1,6 +1,6 @@
-const cron = require('node-cron');
-const repo = require('./repo');
-const { TZ, todayInTZ, matchesDate } = require('./dates');
+import cron from 'node-cron';
+import repo from './repo.js';
+import { TZ, todayInTZ, matchesDate } from './dates.js';
 
 async function announceToday(client) {
   const today = todayInTZ();
@@ -28,4 +28,4 @@ function start(client) {
   console.log(`[cumples] saludos diarios a las ${hour}:00 (${TZ})`);
 }
 
-module.exports = { start, announceToday };
+export { start, announceToday };

@@ -1,10 +1,10 @@
-const {
+import {
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, escapeMarkdown,
   GuildScheduledEventPrivacyLevel, GuildScheduledEventEntityType,
-} = require('discord.js');
-const cfg = require('./config');
-const repo = require('./repo');
-const { dateKey } = require('./time');
+} from 'discord.js';
+import cfg from './config.js';
+import * as repo from './repo.js';
+import { dateKey } from './time.js';
 
 const esc = (s) => escapeMarkdown(String(s));
 const when = (round) => `<t:${Math.floor(round.start_ms / 1000)}:F>`;
@@ -274,7 +274,7 @@ async function repostStaffPanel(client) {
   return staff;
 }
 
-module.exports = {
+export {
   getChannel, getStaffChannel,
   updatePanels, repostStaffPanel,
   openRound, cancelRound, finishPick,

@@ -30,4 +30,4 @@ function matchesDate(b, { year, month, day }) {
   return occurrence(b.day, b.month, year) === Date.UTC(year, month - 1, day);
 }
 
-module.exports = { TZ, isLeap, daysInMonth, todayInTZ, daysUntil, matchesDate };
+export { TZ, isLeap, daysInMonth, todayInTZ, daysUntil, matchesDate };

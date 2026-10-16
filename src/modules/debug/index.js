@@ -1,10 +1,10 @@
-const {
+import {
   SlashCommandBuilder,
   MessageFlags,
   PermissionFlagsBits,
-} = require("discord.js");
-const { announceToday } = require("../birthdays/scheduler");
-const lepocine = require("../lepocine/service");
+} from "discord.js";
+import { announceToday } from "../birthdays/scheduler.js";
+import * as lepocine from "../lepocine/service.js";
 
 const adminCommand = (name, description) =>
   new SlashCommandBuilder()
@@ -18,7 +18,7 @@ const NO_CHANNEL =
 
 const hola = {
   data: new SlashCommandBuilder()
-    .setName("hola")
+    .setName("lc-hola")
     .setDescription("Comando de prueba"),
   async execute(interaction) {
     await interaction.reply("ola putitos");
@@ -27,7 +27,7 @@ const hola = {
 
 const anunciar = {
   data: adminCommand(
-    "debug-anunciar",
+    "lc-debug-anunciar",
     "Fuerza el saludo de cumpleaños de hoy (admin)",
   ),
   async execute(interaction) {
@@ -42,7 +42,7 @@ const anunciar = {
 // Simula el mensaje del lunes: llega al canal del equipo para abrir la encuesta
 const lunes = {
   data: adminCommand(
-    "debug-lunes",
+    "lc-debug-lunes",
     "Lepocine: simula el aviso del lunes para abrir la encuesta (admin)",
   ),
   async execute(interaction) {
@@ -62,7 +62,7 @@ const lunes = {
 // Simula el recordatorio diario de elegir película (ignora la regla de "no el día que se abrió")
 const aviso = {
   data: adminCommand(
-    "debug-aviso",
+    "lc-debug-aviso",
     "Lepocine: prueba el recordatorio diario de elegir película (admin)",
   ),
   async execute(interaction) {
@@ -86,7 +86,7 @@ const aviso = {
 
 const reiniciar = {
   data: adminCommand(
-    "debug-reiniciar",
+    "lc-debug-reiniciar",
     "Lepocine: borra la última encuesta y su evento (admin)",
   ),
   async execute(interaction) {
@@ -107,7 +107,7 @@ const reiniciar = {
   },
 };
 
-module.exports = {
+export default {
   name: "debug",
   commands: [hola, anunciar, lunes, aviso, reiniciar],
 };

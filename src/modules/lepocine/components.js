@@ -1,11 +1,11 @@
-const {
+import {
   ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder,
   ButtonBuilder, ButtonStyle, MessageFlags, escapeMarkdown,
-} = require('discord.js');
-const cfg = require('./config');
-const repo = require('./repo');
-const service = require('./service');
-const { resolveStart } = require('./time');
+} from 'discord.js';
+import cfg from './config.js';
+import * as repo from './repo.js';
+import * as service from './service.js';
+import { resolveStart } from './time.js';
 
 const eph = { flags: MessageFlags.Ephemeral };
 const esc = (s) => escapeMarkdown(String(s));
@@ -203,4 +203,4 @@ async function handle(interaction) {
   }
 }
 
-module.exports = { handle };
+export { handle };

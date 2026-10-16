@@ -1,5 +1,5 @@
-const db = require('../../core/db');
-const cfg = require('./config');
+import db from '../../core/db.js';
+import cfg from './config.js';
 
 db.exec(`
   -- Una "ronda" es una encuesta: día/hora de la película, temática y, al final, la película elegida
@@ -95,18 +95,13 @@ function deleteRound(roundId) {
   q.deleteRound.run(roundId);
 }
 
-module.exports = {
-  getOpenRound,
-  openRound,
-  getLastRound: (guildId) => q.getLast.get(guildId) ?? null,
-  setRoundStatus: (roundId, status) => q.setStatus.run(status, roundId),
-  finishRound: (roundId, title, suggestedBy, pickedBy, eventId) => q.finish.run(title, suggestedBy, pickedBy, eventId, roundId),
-  deleteRound,
-
-  listSuggestions: (roundId) => q.listSug.all(roundId),
-  getSuggestion: (id) => q.getSug.get(id) ?? null,
-  addSuggestion,
-
-  getPanel: (guildId, kind) => q.getPanel.get(guildId, kind) ?? null,
-  setPanel: (guildId, kind, channelId, messageId) => q.setPanel.run(guildId, kind, channelId, messageId),
-};
+export { getOpenRound, openRound, deleteRound, addSuggestion };
+export const getLastRound = (guildId) => q.getLast.get(guildId) ?? null;
+export const setRoundStatus = (roundId, status) => q.setStatus.run(status, roundId);
+export const finishRound = (roundId, title, suggestedBy, pickedBy, eventId) =>
+  q.finish.run(title, suggestedBy, pickedBy, eventId, roundId);
+export const listSuggestions = (roundId) => q.listSug.all(roundId);
+export const getSuggestion = (id) => q.getSug.get(id) ?? null;
+export const getPanel = (guildId, kind) => q.getPanel.get(guildId, kind) ?? null;
+export const setPanel = (guildId, kind, channelId, messageId) =>
+  q.setPanel.run(guildId, kind, channelId, messageId);

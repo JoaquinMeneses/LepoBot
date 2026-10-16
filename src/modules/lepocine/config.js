@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   TZ: process.env.TIMEZONE || 'America/Argentina/Buenos_Aires',
 
   // Canal público: acá la comunidad sugiere películas

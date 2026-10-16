@@ -1,15 +1,15 @@
-require("./core/env");
-const {
+import "./core/env.js";
+import {
   Client,
   GatewayIntentBits,
   Events,
   MessageFlags,
-} = require("discord.js");
-const { loadModules } = require("./core/loader");
+} from "discord.js";
+import { loadModules } from "./core/loader.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-loadModules(client);
+await loadModules(client);
 
 client.once(Events.ClientReady, (c) =>
   console.log(`Conectado como ${c.user.tag}`),

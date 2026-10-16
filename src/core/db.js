@@ -1,6 +1,9 @@
-const { DatabaseSync } = require("node:sqlite");
-const fs = require("node:fs");
-const path = require("node:path");
+import { DatabaseSync } from "node:sqlite";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const dir = path.join(__dirname, "..", "..", "data");
 fs.mkdirSync(dir, { recursive: true });
@@ -24,4 +27,4 @@ db.exec(`
   );
 `);
 
-module.exports = db;
+export default db;

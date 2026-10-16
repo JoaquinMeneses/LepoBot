@@ -1,4 +1,4 @@
-const cfg = require('./config');
+import cfg from './config.js';
 
 // Fecha/hora "de pared" de un instante en una zona horaria
 function partsInTZ(epochMs, tz = cfg.TZ) {
@@ -107,4 +107,4 @@ function resolveStart(dayText, timeText, nowMs = Date.now()) {
   return { ok: true, startMs, endMs: startMs + cfg.durationMinutes * 60_000 };
 }
 
-module.exports = { partsInTZ, zonedEpoch, dateKey, parseTime, resolveStart };
+export { partsInTZ, zonedEpoch, dateKey, parseTime, resolveStart };

@@ -1,24 +1,27 @@
+# LepoBot
+
+Bot de Discord para las actividades de la comunidad: cumpleaños y organización de películas con Lepocine. El proyecto usa ES modules y todos sus comandos slash comienzan con `lc-` para distinguirlos de los de otros bots.
+
 ## Módulos
 
 | Módulo        | Estado          | Descripción                                                                     |
 | ------------- | --------------- | ------------------------------------------------------------------------------- |
 | `birthdays`   | Disponible      | Registro de cumpleaños y saludo automático diario                               |
 | `lepocine`    | Disponible      | Película de la comunidad: encuesta de sugerencias, elección y evento automático |
-| `debug`       | Solo desarrollo | Comandos de prueba. Conviene mantener `src/modules/debug/` en `.gitignore`      |
+| `debug`       | Solo desarrollo | Comandos de prueba; todos usan el prefijo `lc-debug-`                           |
 | `tournaments` | Planeado        | Torneos internos de LoL                                                         |
 | `copypastas`  | Planeado        | Copypastas de la comunidad                                                      |
 
 ### Cumpleaños
 
-Cada usuario registra su fecha y el bot lo saluda a las 9:00 (hora de Argentina) en el canal que elijan los admins. La hora se cambia en `src/modules/birthdays/scheduler.js`.
+Cada persona gestiona su cumpleaños desde un panel privado. El bot saluda a las 9:00 (hora de Argentina) en el canal que elijan los admins. La hora se cambia en `src/modules/birthdays/scheduler.js`.
 
-| Comando                      | Descripción                                                                         |
-| ---------------------------- | ----------------------------------------------------------------------------------- |
-| `/cumple set dia mes [anio]` | Registra tu cumpleaños (el año es opcional; si lo ponés, el saludo incluye la edad) |
-| `/cumple ver [usuario]`      | Muestra el cumpleaños de alguien y cuántos días faltan                              |
-| `/cumple proximos`           | Lista los próximos 10 cumpleaños del servidor                                       |
-| `/cumple borrar`             | Elimina tu cumpleaños                                                               |
-| `/cumple canal`              | Define el canal de saludos (requiere permiso _Gestionar servidor_)                  |
+| Comando                  | Descripción                                                                |
+| ------------------------ | -------------------------------------------------------------------------- |
+| `/lc-cumple panel`       | Abre el panel privado para registrar/editar, consultar o borrar cumpleaños |
+| `/lc-cumple canal canal` | Define el canal de saludos (requiere permiso _Gestionar servidor_)         |
+
+El panel ofrece un formulario para registrar o editar la fecha, consulta privada del propio cumpleaños, listado de los próximos 10 y borrado con confirmación. El año es opcional; si se registra, el saludo incluye la edad.
 
 Los nacidos el 29/02 se saludan el 28/02 en los años no bisiestos.
 
@@ -45,7 +48,7 @@ Los roles se verifican siempre al hacer clic: aunque todos vean los botones del 
 
 | Comando           | Descripción                                                          |
 | ----------------- | -------------------------------------------------------------------- |
-| `/lepocine panel` | Publica de nuevo el panel del equipo (requiere _Gestionar servidor_) |
+| `/lc-lepocine panel` | Publica de nuevo el panel del equipo (requiere _Gestionar servidor_) |
 
 **Configuración** (`src/modules/lepocine/config.js`):
 
@@ -69,7 +72,7 @@ El canal público se define con `LEPOCINE_CHANNEL_ID` en el `.env`. Si preferís
 - [discord.js](https://discord.js.org) v14
 - SQLite integrado de Node (`node:sqlite`), sin dependencias nativas que compilar
 - [node-cron](https://github.com/node-cron/node-cron) para las tareas programadas
-- El `.env` se carga con `process.loadEnvFile()` de Node, sin dotenv (`src/core/env.js`)
+- Proyecto nativo ES modules (`"type": "module"`); `.env` se carga con `process.loadEnvFile()` sin dotenv
 
 ## Puesta en marcha
 
@@ -97,7 +100,7 @@ Creá un archivo `.env` en la raíz con:
 | `LEPOCINE_CHANNEL_ID`       | Canal público de Lepocine                                                                                                                 |
 | `LEPOCINE_VOICE_CHANNEL_ID` | Opcional. Canal de voz para el evento                                                                                                     |
 
-En el hosting, las variables se cargan desde el panel del servicio y no hace falta el archivo `.env`: las que ya existen en el entorno tienen prioridad.
+El archivo `.env` es opcional si las variables ya están definidas en el entorno. No agregues secretos al repositorio.
 
 ### 3. Registrar comandos y arrancar
 
@@ -126,7 +129,7 @@ src/
     │   ├── repo.js           # Tablas y acceso a datos
     │   ├── service.js        # Paneles, evento y avisos
     │   ├── components.js     # Botones, formularios y menús
-    │   ├── command.js        # /lepocine
+    │   ├── command.js        # /lc-lepocine
     │   └── scheduler.js      # Aviso del lunes y recordatorio diario
     └── debug/                # Comandos de prueba (ignorado por git)
 data/
@@ -141,9 +144,9 @@ El loader detecta automáticamente cada carpeta dentro de `src/modules/`. Para c
 2. Exportá este objeto:
 
 ```js
-module.exports = {
+export default {
   name: 'mi-modulo',
-  commands: [{ data: /* SlashCommandBuilder */, execute: async (interaction) => {} }],
+  commands: [{ data: commandData, execute: async (interaction) => {} }],
   components: [{ prefix: 'mi-modulo', handle: async (interaction) => {} }], // opcional: botones, selects y formularios cuyo customId empiece con "mi-modulo:"
   init: (client) => {}, // opcional: tareas programadas, listeners, etc.
 };
@@ -160,25 +163,23 @@ Convenciones del proyecto:
 
 | Comando            | Descripción                                      |
 | ------------------ | ------------------------------------------------ |
-| `/hola`            | Responde un saludo de prueba                     |
-| `/debug-anunciar`  | Fuerza el saludo de cumpleaños de hoy            |
-| `/debug-lunes`     | Simula el aviso del lunes de Lepocine            |
-| `/debug-aviso`     | Fuerza el recordatorio diario de elegir película |
-| `/debug-reiniciar` | Borra la última encuesta de Lepocine y su evento |
+| `/lc-hola`                | Responde un saludo de prueba                     |
+| `/lc-debug-anunciar`      | Fuerza el saludo de cumpleaños de hoy            |
+| `/lc-debug-lunes`         | Simula el aviso del lunes de Lepocine            |
+| `/lc-debug-aviso`         | Fuerza el recordatorio diario de elegir película |
+| `/lc-debug-reiniciar`     | Borra la última encuesta de Lepocine y su evento |
 
 ## Hoja de ruta
 
 - [ ] **Torneos internos de LoL**: inscripción, armado de equipos o brackets y seguimiento de resultados
 - [ ] **Copypastas**: guardar, buscar y lanzar copypastas de la comunidad
 - [ ] Saludos de cumpleaños perdidos: recuperar el saludo si el bot estuvo caído a las 9:00
-- [ ] Ruta de la base configurable por variable de entorno (`DATA_DIR`) para el despliegue
-
 ## Despliegue
 
-El bot necesita un proceso de Node encendido de forma permanente. En plataformas como Railway el disco es efímero: **la base SQLite se pierde en cada deploy** salvo que se guarde en un Volume persistente. Antes de desplegar, configurá la ruta de datos hacia ese Volume y hacé copias de `bot.sqlite` de vez en cuando. Al registrar los comandos en producción, hacelo con las credenciales del bot de producción y desde una copia del repo sin la carpeta `debug`.
+El bot necesita un proceso Node.js en ejecución permanente y un entorno con Node.js 22.13 o superior. Configurá las variables necesarias y ejecutá `npm run deploy` una vez (y cada vez que cambien los comandos). En producción, usá las credenciales de la aplicación Discord de producción.
 
 ## Seguridad
 
 - `.env` y `data/` están en `.gitignore`. Verificá que nunca se suban al repositorio.
 - Si el token se filtra, reseteálo desde el Developer Portal.
-- El módulo `debug` es solo para desarrollo: mantené `src/modules/debug/` en `.gitignore`. Si la carpeta no existe, el bot arranca igual sin esos comandos.
+- Los comandos `lc-debug-*` son herramientas de desarrollo; no los despliegues en el bot público si no los necesitás.

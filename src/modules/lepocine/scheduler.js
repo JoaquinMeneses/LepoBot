@@ -1,6 +1,6 @@
-const cron = require('node-cron');
-const cfg = require('./config');
-const service = require('./service');
+import cron from 'node-cron';
+import cfg from './config.js';
+import * as service from './service.js';
 
 const log = (e) => console.error('[lepocine]', e);
 
@@ -19,4 +19,4 @@ function start(client) {
   console.log(`[lepocine] aviso: lunes ${cfg.mondayHour}:00 · recordatorio: todos los días ${cfg.reminderHour}:00 (${cfg.TZ})`);
 }
 
-module.exports = { start };
+export { start };
