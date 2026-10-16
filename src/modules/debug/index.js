@@ -6,6 +6,16 @@ const {
 const { announceToday } = require("../birthdays/scheduler");
 const lepocine = require("../lepocine/service");
 
+const adminCommand = (name, description) =>
+  new SlashCommandBuilder()
+    .setName(name)
+    .setDescription(description)
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setContexts(0);
+
+const NO_CHANNEL =
+  "No encuentro los canales de Lepocine. Revisá `LEPOCINE_CHANNEL_ID` en el `.env` y `staffChannelId` en `config.js`.";
+
 const hola = {
   data: new SlashCommandBuilder()
     .setName("hola")
@@ -16,11 +26,10 @@ const hola = {
 };
 
 const anunciar = {
-  data: new SlashCommandBuilder()
-    .setName("debug-anunciar")
-    .setDescription("Fuerza el saludo de cumpleaños de hoy (admin)")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-    .setContexts(0),
+  data: adminCommand(
+    "debug-anunciar",
+    "Fuerza el saludo de cumpleaños de hoy (admin)",
+  ),
   async execute(interaction) {
     await announceToday(interaction.client);
     await interaction.reply({
@@ -30,47 +39,66 @@ const anunciar = {
   },
 };
 
-const lepocineAviso = {
-  data: new SlashCommandBuilder()
-    .setName("debug-aviso")
-    .setDescription("Lepocine: prueba el aviso de falta elegir película (admin)")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-    .setContexts(0),
+// Simula el mensaje del lunes: llega al canal del equipo para abrir la encuesta
+const lunes = {
+  data: adminCommand(
+    "debug-lunes",
+    "Lepocine: simula el aviso del lunes para abrir la encuesta (admin)",
+  ),
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const { status, channel } = await lepocine.warnMissing(interaction.client);
+    const { status } = await lepocine.mondayPrompt(interaction.client);
 
     const msg = {
-      warned: `Aviso enviado en ${channel}.`,
-      "has-night":
-        "Ya hay una película elegida para este viernes, no hay nada que avisar. Usá `/debug-reiniciar` para probar de nuevo.",
-      "no-channel":
-        "No encuentro el canal. Revisá `LEPOCINE_CHANNEL_ID` en el `.env`.",
+      prompted: "Mandé el aviso del lunes al canal del equipo.",
+      "open-round":
+        "Ya hay una encuesta abierta, así que republiqué el panel sin mención.",
+      "no-channel": NO_CHANNEL,
     }[status];
     await interaction.editReply(msg ?? "Listo.");
   },
 };
 
-const lepocineReiniciar = {
-  data: new SlashCommandBuilder()
-    .setName("debug-reiniciar")
-    .setDescription("Lepocine: deshace la elección de esta semana y borra su evento (admin)")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-    .setContexts(0),
+// Simula el recordatorio diario de elegir película (ignora la regla de "no el día que se abrió")
+const aviso = {
+  data: adminCommand(
+    "debug-aviso",
+    "Lepocine: prueba el recordatorio diario de elegir película (admin)",
+  ),
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const r = await lepocine.resetWeek(interaction.client);
+    const { status, channel } = await lepocine.dailyReminder(
+      interaction.client,
+      { force: true },
+    );
 
-    if (r.status === "no-channel") {
-      return interaction.editReply(
-        "No encuentro el canal. Revisá `LEPOCINE_CHANNEL_ID` en el `.env`.",
-      );
-    }
+    const msg = {
+      sent: `Recordatorio enviado en ${channel}.`,
+      "no-round":
+        "No hay una encuesta abierta. Abrila desde el panel del equipo.",
+      "no-suggestions":
+        "La encuesta está abierta pero todavía no hay sugerencias, así que no hay nada que confirmar.",
+      "no-channel": NO_CHANNEL,
+    }[status];
+    await interaction.editReply(msg ?? "Listo.");
+  },
+};
+
+const reiniciar = {
+  data: adminCommand(
+    "debug-reiniciar",
+    "Lepocine: borra la última encuesta y su evento (admin)",
+  ),
+  async execute(interaction) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const r = await lepocine.resetLast(interaction.client);
+
+    if (r.status === "no-channel") return interaction.editReply(NO_CHANNEL);
     if (r.status === "nothing") {
-      return interaction.editReply("No había nada elegido para este viernes.");
+      return interaction.editReply("No había ninguna encuesta para borrar.");
     }
     await interaction.editReply(
-      `Semana reiniciada y panel reabierto.${
+      `Última encuesta borrada y paneles actualizados.${
         r.eventDeleted
           ? " Borré también el evento."
           : " (No había evento que borrar, o borralo a mano.)"
@@ -81,5 +109,5 @@ const lepocineReiniciar = {
 
 module.exports = {
   name: "debug",
-  commands: [hola, anunciar, lepocineAviso, lepocineReiniciar],
+  commands: [hola, anunciar, lunes, aviso, reiniciar],
 };

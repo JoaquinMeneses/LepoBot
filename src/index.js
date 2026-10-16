@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("./core/env");
 const {
   Client,
   GatewayIntentBits,

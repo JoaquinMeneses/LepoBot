@@ -1,37 +1,23 @@
 const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const service = require('./service');
 
-// Comando solo de administración: los miembros usan los botones del panel.
+// Comando solo de administración: el equipo y la comunidad usan los botones de los paneles.
 // (Los comandos de prueba viven en el módulo `debug`.)
 const data = new SlashCommandBuilder()
   .setName('lepocine')
   .setDescription('Administración de Lepocine')
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .setContexts(0)
-  .addSubcommand((s) => s.setName('panel').setDescription('Publica paneles nuevos en los canales de Lepocine'))
-  .addSubcommand((s) => s.setName('evento').setDescription('Crea ahora el evento del viernes con la película elegida'));
+  .addSubcommand((s) => s.setName('panel').setDescription('Publica de nuevo el panel del equipo en su canal'));
 
 async function execute(interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  const channel = await service.getChannel(interaction.client);
-  if (!channel) {
-    return interaction.editReply('No encuentro el canal. Revisá `LEPOCINE_CHANNEL_ID` en el `.env` y los permisos del bot.');
+  const staff = await service.repostStaffPanel(interaction.client);
+  if (!staff) {
+    return interaction.editReply('No encuentro el canal del equipo. Revisá `staffChannelId` en `config.js` y los permisos del bot.');
   }
-
-  if (interaction.options.getSubcommand() === 'panel') {
-    const posted = await service.repostPanels(interaction.client);
-    return interaction.editReply(`Panel publicado en ${posted.join(' y ')}.`);
-  }
-
-  const { status } = await service.processWeek(interaction.client);
-  const msg = {
-    created: 'Evento creado.',
-    exists: 'El evento de este viernes ya estaba creado.',
-    'no-night': 'Todavía no hay película elegida para este viernes.',
-    error: 'No pude crear el evento. Mirá el canal y la consola.',
-  }[status] ?? 'Listo.';
-  return interaction.editReply(msg);
+  return interaction.editReply(`Panel publicado en ${staff}.`);
 }
 
 module.exports = { data, execute };

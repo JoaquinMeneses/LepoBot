@@ -4,9 +4,11 @@ const {
 } = require('discord.js');
 const cfg = require('./config');
 const repo = require('./repo');
-const { nextFriday } = require('./time');
+const { dateKey } = require('./time');
 
 const esc = (s) => escapeMarkdown(String(s));
+const when = (round) => `<t:${Math.floor(round.start_ms / 1000)}:F>`;
+const roleMentions = () => cfg.staffRoleIds.map((id) => `<@&${id}>`).join(' ');
 
 // ---------- Canales ----------
 
@@ -21,93 +23,99 @@ async function fetchChannel(client, id) {
 }
 
 const getChannel = (client) => fetchChannel(client, cfg.channelId);          // canal público
-const getStaffChannel = (client) => fetchChannel(client, cfg.staffChannelId); // canal del equipo (opcional)
+const getStaffChannel = (client) => fetchChannel(client, cfg.staffChannelId); // canal del equipo
 
-/** Canales donde hay panel: el público y, si está configurado, el del equipo. */
-async function panelTargets(client) {
-  const targets = [];
-  const pub = await getChannel(client);
-  if (pub) targets.push({ kind: 'public', channel: pub });
-  const staff = await getStaffChannel(client);
-  if (staff) targets.push({ kind: 'staff', channel: staff });
-  return targets;
+// ---------- Paneles ----------
+
+function suggestionLines(list) {
+  return list.length
+    ? list.map((s, i) => `${i + 1}. **${esc(s.title)}** · ${esc(s.user_name)}`).join('\n')
+    : '_Todavía no hay sugerencias._';
 }
 
-// ---------- Panel ----------
+const button = (id, label, emoji, style, disabled = false) =>
+  new ButtonBuilder().setCustomId(id).setLabel(label).setEmoji(emoji).setStyle(style).setDisabled(disabled);
 
-/**
- * kind 'public': botón de sugerir (y el de elegir solo si no hay canal del equipo).
- * kind 'staff':  botón de elegir.
- */
-function buildPanel(guildId, kind = 'public', t = nextFriday()) {
-  const night = repo.getNight(guildId, t.key);
-  const closed = Boolean(night?.event_id);
-  const open = repo.listOpen(guildId);
-  const when = `<t:${Math.floor(t.startMs / 1000)}:F>`;
+/** Último evento creado que todavía no terminó (para mostrarlo en los paneles). */
+function upcomingEvent(guildId) {
+  const last = repo.getLastRound(guildId);
+  return last?.status === 'done' && last.end_ms > Date.now() ? last : null;
+}
 
+function buildPublicPanel(guildId) {
+  const open = repo.getOpenRound(guildId);
+  const upcoming = upcomingEvent(guildId);
   let desc;
-  if (closed) {
-    desc = `🎟️ **Evento creado:** ${esc(night.title)}\n📅 ${when}\n\nLas sugerencias se abren de nuevo el lunes.`;
-  } else if (night) {
-    desc = `✅ **Elegida:** ${esc(night.title)} _(sugerida por ${esc(night.suggested_by)})_\n📅 ${when}\n\nEl evento se crea el miércoles. Hasta entonces el equipo todavía puede cambiar la elección.`;
-  } else if (kind === 'staff') {
-    desc = `Elegí la película del viernes 📅 ${when}`;
-  } else {
-    desc = `Sugerí qué película ver el viernes 📅 ${when}`;
-  }
-
-  if (!closed) {
-    const lines = open.length
-      ? open.map((s, i) => `${i + 1}. **${esc(s.title)}** · ${esc(s.user_name)}`).join('\n')
-      : '_Todavía no hay sugerencias._';
-    desc += `\n\n**Sugerencias (${open.length}/${cfg.maxSuggestions})**\n${lines}`;
-  }
-
-  const embed = new EmbedBuilder()
-    .setColor(0x9b59b6)
-    .setTitle('🎬 Lepocine')
-    .setDescription(desc.slice(0, 4000))
-    .setFooter({
-      text: kind === 'staff'
-        ? 'Panel del equipo'
-        : 'Una sugerencia por persona: si sugerís de nuevo, reemplazás la anterior.',
-    });
-
-  const suggestBtn = new ButtonBuilder().setCustomId('lepocine:suggest').setLabel('Sugerir película').setEmoji('➕')
-    .setStyle(ButtonStyle.Primary).setDisabled(closed);
-  const pickBtn = new ButtonBuilder().setCustomId('lepocine:pick').setLabel('Elegir película').setEmoji('🎞️')
-    .setStyle(ButtonStyle.Success).setDisabled(closed);
-
   let buttons;
-  if (kind === 'staff') buttons = [pickBtn];
-  else buttons = cfg.staffChannelId ? [suggestBtn] : [suggestBtn, pickBtn];
 
-  return {
-    embeds: [embed],
-    components: [new ActionRowBuilder().addComponents(buttons)],
-    allowedMentions: { parse: [] },
-  };
+  if (open) {
+    desc = `Sugerí qué película ver el 📅 ${when(open)}`;
+    if (open.theme) desc += `\n🎯 **Temática:** ${esc(open.theme)}`;
+    const list = repo.listSuggestions(open.id);
+    desc += `\n\n**Sugerencias (${list.length}/${cfg.maxSuggestions})**\n${suggestionLines(list)}`;
+    buttons = [button('lepocine:suggest', 'Sugerir película', '➕', ButtonStyle.Primary)];
+  } else if (upcoming) {
+    desc = `🎟️ **Evento creado:** ${esc(upcoming.title)}\n📅 ${when(upcoming)}\n\nLa próxima encuesta la abre el equipo.`;
+    buttons = [button('lepocine:suggest', 'Sugerir película', '➕', ButtonStyle.Primary, true)];
+  } else {
+    desc = 'No hay una encuesta abierta por ahora. La abre el equipo cuando toca elegir película.';
+    buttons = [button('lepocine:suggest', 'Sugerir película', '➕', ButtonStyle.Primary, true)];
+  }
+
+  const embed = new EmbedBuilder().setColor(0x9b59b6).setTitle('🎬 Lepocine').setDescription(desc.slice(0, 4000));
+  if (open) embed.setFooter({ text: 'Una sugerencia por persona: si sugerís de nuevo, reemplazás la anterior.' });
+
+  return { content: '', embeds: [embed], components: [new ActionRowBuilder().addComponents(buttons)], allowedMentions: { parse: [] } };
 }
 
-/** Actualiza el panel existente; si no existe o se borró, publica uno nuevo. */
-async function updateOne(channel, kind) {
+function buildStaffPanel(guildId) {
+  const open = repo.getOpenRound(guildId);
+  let desc;
+  let buttons;
+
+  if (open) {
+    desc = `**Encuesta abierta** · 📅 ${when(open)}`;
+    if (open.theme) desc += `\n🎯 **Temática:** ${esc(open.theme)}`;
+    const list = repo.listSuggestions(open.id);
+    desc += `\n\n**Sugerencias (${list.length}/${cfg.maxSuggestions})**\n${suggestionLines(list)}`;
+    buttons = [
+      button('lepocine:pick', 'Elegir película', '🎞️', ButtonStyle.Success),
+      button('lepocine:cancel', 'Cancelar encuesta', '✖️', ButtonStyle.Secondary),
+    ];
+  } else {
+    desc = 'Abrí una encuesta para que la comunidad sugiera la próxima película.';
+    const upcoming = upcomingEvent(guildId);
+    if (upcoming) desc += `\n\n🎟️ **Próximo evento:** ${esc(upcoming.title)} · ${when(upcoming)}`;
+    buttons = [button('lepocine:open', 'Abrir encuesta', '🗳️', ButtonStyle.Primary)];
+  }
+
+  const embed = new EmbedBuilder().setColor(0x9b59b6).setTitle('🎬 Lepocine').setDescription(desc.slice(0, 4000))
+    .setFooter({ text: 'Panel del equipo' });
+
+  return { content: '', embeds: [embed], components: [new ActionRowBuilder().addComponents(buttons)], allowedMentions: { parse: [] } };
+}
+
+const buildPanel = (guildId, kind) => (kind === 'staff' ? buildStaffPanel(guildId) : buildPublicPanel(guildId));
+
+/** Edita el panel existente. Si no existe (o se borró), lo publica solo si createIfMissing. */
+async function updateOne(channel, kind, createIfMissing) {
   const guildId = channel.guild.id;
-  const payload = buildPanel(guildId, kind);
   const saved = repo.getPanel(guildId, kind);
 
   if (saved && saved.channel_id === channel.id) {
     try {
       const msg = await channel.messages.fetch(saved.message_id);
-      await msg.edit(payload);
+      await msg.edit(buildPanel(guildId, kind));
       return;
-    } catch { /* el mensaje ya no existe: se publica uno nuevo */ }
+    } catch { /* el mensaje ya no existe */ }
   }
-  const msg = await channel.send(payload);
+  if (!createIfMissing) return;
+  const msg = await channel.send(buildPanel(guildId, kind));
   repo.setPanel(guildId, kind, channel.id, msg.id);
 }
 
-/** Borra el panel anterior y publica uno nuevo. */
-async function repostOne(channel, kind) {
+/** Borra el panel anterior y publica uno nuevo (llega como mensaje nuevo, con notificación). */
+async function repostOne(channel, kind, { content, ping = false } = {}) {
   const guildId = channel.guild.id;
   const saved = repo.getPanel(guildId, kind);
   if (saved) {
@@ -116,41 +124,57 @@ async function repostOne(channel, kind) {
       await old?.delete();
     } catch { /* ya no estaba */ }
   }
-  const msg = await channel.send(buildPanel(guildId, kind));
+  const payload = buildPanel(guildId, kind);
+  if (content) payload.content = content;
+  if (ping) payload.allowedMentions = { roles: cfg.staffRoleIds };
+
+  const msg = await channel.send(payload);
   repo.setPanel(guildId, kind, channel.id, msg.id);
 }
 
-/** Refresca todos los paneles (público y del equipo). */
-async function updatePanel(client) {
-  for (const { kind, channel } of await panelTargets(client)) {
-    await updateOne(channel, kind).catch((e) => console.error(`[lepocine] panel ${kind}:`, e.message));
-  }
+/** Refresca los dos paneles. El público solo se edita si ya existe; el del equipo siempre queda publicado. */
+async function updatePanels(client) {
+  const pub = await getChannel(client);
+  if (pub) await updateOne(pub, 'public', false).catch((e) => console.error('[lepocine] panel público:', e.message));
+  const staff = await getStaffChannel(client);
+  if (staff) await updateOne(staff, 'staff', true).catch((e) => console.error('[lepocine] panel del equipo:', e.message));
 }
 
-/** Publica paneles nuevos en todos los canales. Devuelve los canales donde publicó. */
-async function repostPanels(client) {
-  const targets = await panelTargets(client);
-  for (const { kind, channel } of targets) await repostOne(channel, kind);
-  return targets.map((t) => t.channel);
+// ---------- Encuesta ----------
+
+/** Abre una encuesta: publica el panel público nuevo y actualiza el del equipo. */
+async function openRound(client, { theme, startMs, endMs, openedBy }) {
+  const pub = await getChannel(client);
+  if (!pub) throw new Error('No encuentro el canal público de Lepocine');
+
+  repo.openRound(pub.guild.id, { theme, startMs, endMs, openedBy });
+  await repostOne(pub, 'public');
+  await updatePanels(client);
+  return pub;
 }
 
-/** Lunes: archiva las sugerencias de la semana pasada y abre paneles limpios. */
-async function newWeek(client) {
-  const channel = await getChannel(client);
-  if (!channel) return;
-  repo.archiveOpen(channel.guild.id);
-  await repostPanels(client);
+async function cancelRound(client) {
+  const pub = await getChannel(client);
+  if (!pub) return false;
+  const round = repo.getOpenRound(pub.guild.id);
+  if (!round) return false;
+  repo.setRoundStatus(round.id, 'cancelled');
+  await updatePanels(client);
+  return true;
 }
 
-// ---------- Evento ----------
-
-async function createEvent(guild, night, t) {
+async function createEvent(guild, round, suggestion) {
   const opts = {
-    name: `Lepocine: "${night.title}"`.slice(0, 100),
-    scheduledStartTime: new Date(t.startMs),
-    scheduledEndTime: new Date(t.endMs),
+    name: `Lepocine: "${suggestion.title}"`.slice(0, 100),
+    scheduledStartTime: new Date(round.start_ms),
+    scheduledEndTime: new Date(round.end_ms),
     privacyLevel: GuildScheduledEventPrivacyLevel.GuildOnly,
-    description: `Viernes de Lepocine 🎬\nPelícula: ${night.title}\nSugerida por ${night.suggested_by}`,
+    description: [
+      'Lepocine 🎬',
+      `Película: ${suggestion.title}`,
+      round.theme ? `Temática: ${round.theme}` : null,
+      `Sugerida por ${suggestion.user_name}`,
+    ].filter(Boolean).join('\n'),
   };
 
   if (cfg.voiceChannelId) {
@@ -163,68 +187,96 @@ async function createEvent(guild, night, t) {
   return guild.scheduledEvents.create(opts);
 }
 
-/** Avisa al equipo que falta elegir película (si ya hay una elegida, no hace nada). */
-async function warnMissing(client) {
-  const channel = await getChannel(client);
-  if (!channel) return { status: 'no-channel' };
-  if (repo.getNight(channel.guild.id, nextFriday().key)) return { status: 'has-night' };
+/**
+ * Confirma la película: crea el evento y cierra la encuesta.
+ * Si Discord rechaza el evento, lanza el error y no cambia nada (se puede volver a intentar).
+ */
+async function finishPick(client, round, suggestion, pickedBy) {
+  const pub = await getChannel(client);
+  if (!pub) throw new Error('No encuentro el canal público de Lepocine');
 
-  // El aviso va al canal del equipo si existe; si no, al público
-  const warnChannel = (await getStaffChannel(client)) ?? channel;
-  const roles = cfg.staffRoleIds.map((id) => `<@&${id}>`).join(' ');
-  await warnChannel.send(`⚠️ Todavía no se eligió la película del viernes. ${roles} elíjanla desde el panel para crear el evento.`);
-  return { status: 'warned', channel: warnChannel };
+  const event = await createEvent(pub.guild, round, suggestion);
+  repo.finishRound(round.id, suggestion.title, suggestion.user_name, pickedBy, event.id);
+
+  await pub.send(`🎬 ¡Ya está el evento! **${esc(suggestion.title)}**\n${event.url}`)
+    .catch((e) => console.error('[lepocine] anuncio:', e.message));
+  await updatePanels(client);
+  return event;
 }
 
-/** Solo para pruebas: deshace la elección de esta semana, borra su evento y reabre el panel. */
-async function resetWeek(client) {
-  const channel = await getChannel(client);
-  if (!channel) return { status: 'no-channel' };
+// ---------- Avisos ----------
 
-  const t = nextFriday();
-  const night = repo.resetNight(channel.guild.id, t.key);
-  if (!night) return { status: 'nothing' };
+/** Lunes: llega el mensaje al canal del equipo para abrir la encuesta. */
+async function mondayPrompt(client) {
+  const staff = await getStaffChannel(client);
+  if (!staff) return { status: 'no-channel' };
 
-  let eventDeleted = false;
-  if (night.event_id) {
-    try {
-      await channel.guild.scheduledEvents.delete(night.event_id);
-      eventDeleted = true;
-    } catch { /* ya no existía o falta permiso */ }
-  }
-  await updatePanel(client);
-  return { status: 'reset', eventDeleted };
+  const idle = !repo.getOpenRound(staff.guild.id);
+  await repostOne(staff, 'staff', idle
+    ? { content: `¡Nueva semana de Lepocine! ${roleMentions()} ¿Abrimos la encuesta de películas?`, ping: true }
+    : {});
+
+  const pub = await getChannel(client);
+  if (pub) await updateOne(pub, 'public', false).catch(() => {});
+  return { status: idle ? 'prompted' : 'open-round' };
 }
 
 /**
- * Crea el evento de la próxima función si ya hay película elegida y todavía no existe.
- * warnIfMissing: avisa al equipo si nadie eligió (lo usa el cron del miércoles).
+ * Recordatorio diario al equipo: hay encuesta abierta, hay sugerencias y falta elegir.
+ * No avisa el mismo día en que se abrió la encuesta, salvo force (pruebas).
  */
-async function processWeek(client, { warnIfMissing = false } = {}) {
-  const channel = await getChannel(client);
-  if (!channel) return { status: 'no-channel' };
+async function dailyReminder(client, { force = false } = {}) {
+  const pub = await getChannel(client);
+  const staff = await getStaffChannel(client);
+  if (!pub || !staff) return { status: 'no-channel' };
 
-  const guild = channel.guild;
-  const t = nextFriday();
-  const night = repo.getNight(guild.id, t.key);
+  const round = repo.getOpenRound(pub.guild.id);
+  if (!round) return { status: 'no-round' };
 
-  if (!night) {
-    if (warnIfMissing) await warnMissing(client);
-    return { status: 'no-night' };
-  }
-  if (night.event_id) return { status: 'exists' };
+  const count = repo.listSuggestions(round.id).length;
+  if (!count) return { status: 'no-suggestions' };
+  if (!force && dateKey(round.created_at) === dateKey(Date.now())) return { status: 'opened-today' };
 
-  try {
-    const event = await createEvent(guild, night, t);
-    repo.setNightEvent(guild.id, t.key, event.id);
-    await channel.send(`🎬 ¡Ya está el evento del viernes! **${esc(night.title)}**\n${event.url}`);
-    await updatePanel(client);
-    return { status: 'created', event };
-  } catch (err) {
-    console.error('[lepocine] error creando el evento:', err);
-    await channel.send(`⚠️ No pude crear el evento de **${esc(night.title)}**. Revisá que el bot tenga los permisos *Crear eventos* y *Gestionar eventos*.`).catch(() => {});
-    return { status: 'error', error: err };
-  }
+  const panel = repo.getPanel(staff.guild.id, 'staff');
+  const link = panel ? `\n[Ir al panel](https://discord.com/channels/${staff.guild.id}/${panel.channel_id}/${panel.message_id})` : '';
+  await staff.send({
+    content: `⏰ ${roleMentions()} Falta elegir la película del ${when(round)}. Hay ${count} sugerencia${count === 1 ? '' : 's'}.${link}`,
+    allowedMentions: { roles: cfg.staffRoleIds },
+  });
+  return { status: 'sent', channel: staff };
 }
 
-module.exports = { buildPanel, updatePanel, repostPanels, newWeek, processWeek, warnMissing, resetWeek, getChannel };
+/** Solo para pruebas: borra la última encuesta (y su evento, si lo tiene) y refresca los paneles. */
+async function resetLast(client) {
+  const pub = await getChannel(client);
+  if (!pub) return { status: 'no-channel' };
+
+  const last = repo.getLastRound(pub.guild.id);
+  if (!last) return { status: 'nothing' };
+
+  let eventDeleted = false;
+  if (last.event_id) {
+    try {
+      await pub.guild.scheduledEvents.delete(last.event_id);
+      eventDeleted = true;
+    } catch { /* ya no existía o falta permiso */ }
+  }
+  repo.deleteRound(last.id);
+  await updatePanels(client);
+  return { status: 'reset', eventDeleted };
+}
+
+/** Publica un panel nuevo en el canal del equipo (sin mención). */
+async function repostStaffPanel(client) {
+  const staff = await getStaffChannel(client);
+  if (!staff) return null;
+  await repostOne(staff, 'staff');
+  return staff;
+}
+
+module.exports = {
+  getChannel, getStaffChannel,
+  updatePanels, repostStaffPanel,
+  openRound, cancelRound, finishPick,
+  mondayPrompt, dailyReminder, resetLast,
+};

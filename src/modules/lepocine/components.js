@@ -1,15 +1,16 @@
 const {
   ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder,
-  MessageFlags, escapeMarkdown,
+  ButtonBuilder, ButtonStyle, MessageFlags, escapeMarkdown,
 } = require('discord.js');
 const cfg = require('./config');
 const repo = require('./repo');
 const service = require('./service');
-const { nextFriday } = require('./time');
+const { resolveStart } = require('./time');
 
 const eph = { flags: MessageFlags.Ephemeral };
 const esc = (s) => escapeMarkdown(String(s));
-const clean = (s) => s.replace(/\s+/g, ' ').trim().slice(0, 80);
+const clean = (s, max) => s.replace(/\s+/g, ' ').trim().slice(0, max);
+const DENIED = { content: 'Solo el equipo puede hacer esto.', ...eph };
 
 function isStaff(interaction) {
   const roles = interaction.member?.roles;
@@ -18,48 +19,86 @@ function isStaff(interaction) {
   return cfg.staffRoleIds.some(has);
 }
 
-function isClosed(guildId) {
-  return Boolean(repo.getNight(guildId, nextFriday().key)?.event_id);
+const textRow = (input) => new ActionRowBuilder().addComponents(input);
+
+// ---- Abrir la encuesta (equipo) ----
+
+async function openRoundModal(interaction) {
+  if (!isStaff(interaction)) return interaction.reply(DENIED);
+  if (repo.getOpenRound(interaction.guildId)) {
+    return interaction.reply({ content: 'Ya hay una encuesta abierta. Elegí una película o cancelala antes de abrir otra.', ...eph });
+  }
+
+  const modal = new ModalBuilder().setCustomId('lepocine:open-modal').setTitle('Abrir encuesta de película');
+  modal.addComponents(
+    textRow(new TextInputBuilder().setCustomId('day').setLabel('Día de la película')
+      .setPlaceholder('viernes, mañana o 17/10').setValue(cfg.defaultDay)
+      .setStyle(TextInputStyle.Short).setMaxLength(20).setRequired(true)),
+    textRow(new TextInputBuilder().setCustomId('time').setLabel('Hora')
+      .setPlaceholder('21:00').setValue(cfg.defaultTime)
+      .setStyle(TextInputStyle.Short).setMaxLength(8).setRequired(true)),
+    textRow(new TextInputBuilder().setCustomId('theme').setLabel('Temática para sugerir (opcional)')
+      .setPlaceholder('Ej: terror, años 90, animadas')
+      .setStyle(TextInputStyle.Short).setMaxLength(100).setRequired(false)),
+  );
+  return interaction.showModal(modal);
 }
 
-// ---- Sugerir ----
+async function submitOpenRound(interaction) {
+  if (!isStaff(interaction)) return interaction.reply(DENIED);
+  if (repo.getOpenRound(interaction.guildId)) {
+    return interaction.reply({ content: 'Ya hay una encuesta abierta.', ...eph });
+  }
+
+  const r = resolveStart(
+    interaction.fields.getTextInputValue('day'),
+    interaction.fields.getTextInputValue('time'),
+  );
+  if (!r.ok) return interaction.reply({ content: `⚠️ ${r.error}`, ...eph });
+
+  const theme = clean(interaction.fields.getTextInputValue('theme'), 100) || null;
+
+  await interaction.deferReply(eph);
+  const pub = await service.openRound(interaction.client, {
+    theme, startMs: r.startMs, endMs: r.endMs, openedBy: interaction.user.id,
+  });
+  await interaction.editReply(
+    `✅ Encuesta abierta para <t:${Math.floor(r.startMs / 1000)}:F>${theme ? ` · temática: **${esc(theme)}**` : ''}.\nEl panel para sugerir ya está en ${pub}.`,
+  );
+}
+
+// ---- Sugerir (comunidad) ----
 
 async function openSuggestModal(interaction) {
-  if (isClosed(interaction.guildId)) {
-    return interaction.reply({ content: 'Las sugerencias ya cerraron: el evento de esta semana está creado. Se abren de nuevo el lunes.', ...eph });
+  if (!repo.getOpenRound(interaction.guildId)) {
+    return interaction.reply({ content: 'La encuesta ya cerró. Cuando el equipo abra otra, vas a poder sugerir.', ...eph });
   }
 
   const modal = new ModalBuilder().setCustomId('lepocine:suggest-modal').setTitle('Sugerir película');
   modal.addComponents(
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder()
-        .setCustomId('title')
-        .setLabel('Nombre de la película')
-        .setPlaceholder('Ej: El Padrino')
-        .setStyle(TextInputStyle.Short)
-        .setMinLength(1)
-        .setMaxLength(80)
-        .setRequired(true),
-    ),
+    textRow(new TextInputBuilder().setCustomId('title').setLabel('Nombre de la película')
+      .setPlaceholder('Ej: El Padrino').setStyle(TextInputStyle.Short)
+      .setMinLength(1).setMaxLength(80).setRequired(true)),
   );
   return interaction.showModal(modal);
 }
 
 async function submitSuggestion(interaction) {
-  if (isClosed(interaction.guildId)) {
-    return interaction.reply({ content: 'Las sugerencias ya cerraron: el evento de esta semana está creado. Se abren de nuevo el lunes.', ...eph });
+  const round = repo.getOpenRound(interaction.guildId);
+  if (!round) {
+    return interaction.reply({ content: 'La encuesta ya cerró. Cuando el equipo abra otra, vas a poder sugerir.', ...eph });
   }
 
-  const title = clean(interaction.fields.getTextInputValue('title'));
+  const title = clean(interaction.fields.getTextInputValue('title'), 80);
   if (!title) return interaction.reply({ content: 'Escribí el nombre de la película.', ...eph });
 
   const name = (interaction.member?.displayName ?? interaction.user.globalName ?? interaction.user.username).slice(0, 32);
-  const res = repo.addSuggestion(interaction.guildId, interaction.user.id, name, title);
+  const res = repo.addSuggestion(round.id, interaction.user.id, name, title);
 
   if (!res.ok) {
     const msg = res.reason === 'duplicate'
       ? `**${esc(title)}** ya fue sugerida por ${esc(res.by)}.`
-      : `La lista ya tiene ${cfg.maxSuggestions} sugerencias. Esperá a que se elija o a la semana próxima.`;
+      : `La lista ya tiene ${cfg.maxSuggestions} sugerencias.`;
     return interaction.reply({ content: msg, ...eph });
   }
 
@@ -69,74 +108,97 @@ async function submitSuggestion(interaction) {
       : `✅ Anotada: **${esc(title)}**`,
     ...eph,
   });
-  await service.updatePanel(interaction.client).catch((e) => console.error('[lepocine] panel:', e));
+  await service.updatePanels(interaction.client).catch((e) => console.error('[lepocine] panel:', e));
 }
 
-// ---- Elegir (solo equipo) ----
+// ---- Elegir (equipo) ----
 
 async function openPickMenu(interaction) {
-  if (!isStaff(interaction)) {
-    return interaction.reply({ content: 'Solo el equipo puede elegir la película.', ...eph });
-  }
-  if (isClosed(interaction.guildId)) {
-    return interaction.reply({ content: 'El evento de esta semana ya está creado.', ...eph });
-  }
+  if (!isStaff(interaction)) return interaction.reply(DENIED);
 
-  const open = repo.listOpen(interaction.guildId);
-  if (!open.length) {
-    return interaction.reply({ content: 'Todavía no hay películas sugeridas.', ...eph });
-  }
+  const round = repo.getOpenRound(interaction.guildId);
+  if (!round) return interaction.reply({ content: 'No hay una encuesta abierta.', ...eph });
+
+  const list = repo.listSuggestions(round.id);
+  if (!list.length) return interaction.reply({ content: 'Todavía no hay películas sugeridas.', ...eph });
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId('lepocine:pick-select')
-    .setPlaceholder('Elegí la película del viernes')
-    .addOptions(open.map((s) => ({
+    .setPlaceholder('Elegí la película')
+    .addOptions(list.map((s) => ({
       label: s.title.slice(0, 100),
       description: `Sugerida por ${s.user_name}`.slice(0, 100),
       value: String(s.id),
     })));
 
   return interaction.reply({
-    content: '🎞️ **¿Qué película vemos el viernes?**',
+    content: `🎞️ **¿Qué película vemos?** · <t:${Math.floor(round.start_ms / 1000)}:F>`,
     components: [new ActionRowBuilder().addComponents(menu)],
     ...eph,
   });
 }
 
 async function submitPick(interaction) {
-  if (!isStaff(interaction)) {
-    return interaction.reply({ content: 'Solo el equipo puede elegir la película.', ...eph });
-  }
+  if (!isStaff(interaction)) return interaction.reply(DENIED);
   await interaction.deferUpdate();
 
-  const guildId = interaction.guildId;
-  const t = nextFriday();
-  if (repo.getNight(guildId, t.key)?.event_id) {
-    return interaction.editReply({ content: 'El evento de esta semana ya está creado.', components: [] });
+  const round = repo.getOpenRound(interaction.guildId);
+  if (!round) {
+    return interaction.editReply({ content: 'La encuesta ya no está abierta (la fecha pasó o se cerró).', components: [] });
   }
 
-  const picked = repo.pickSuggestion(guildId, t.key, Number(interaction.values[0]), interaction.user.id);
-  if (!picked) {
+  const suggestion = repo.getSuggestion(Number(interaction.values[0]));
+  if (!suggestion || suggestion.round_id !== round.id) {
     return interaction.editReply({ content: 'Esa sugerencia ya no está disponible. Volvé a abrir el selector.', components: [] });
   }
 
-  let note = 'El evento se crea el miércoles.';
-  if (Date.now() >= t.cutoffMs) {
-    // Ya pasó el miércoles: se crea el evento en el momento
-    const r = await service.processWeek(interaction.client);
-    note = r.status === 'created' ? '¡Evento creado!' : 'No pude crear el evento, revisá el canal.';
+  try {
+    await service.finishPick(interaction.client, round, suggestion, interaction.user.id);
+  } catch (err) {
+    console.error('[lepocine] error creando el evento:', err);
+    return interaction.editReply({
+      content: '⚠️ No pude crear el evento. Revisá que el bot tenga los permisos *Crear eventos* y *Gestionar eventos*, y volvé a elegir.',
+      components: [],
+    });
   }
+  await interaction.editReply({ content: `🎞️ Elegiste **${esc(suggestion.title)}**. ¡Evento creado!`, components: [] });
+}
 
-  await interaction.editReply({ content: `🎞️ Elegiste **${esc(picked.title)}**. ${note}`, components: [] });
-  await service.updatePanel(interaction.client).catch((e) => console.error('[lepocine] panel:', e));
+// ---- Cancelar (equipo) ----
+
+async function askCancel(interaction) {
+  if (!isStaff(interaction)) return interaction.reply(DENIED);
+
+  const round = repo.getOpenRound(interaction.guildId);
+  if (!round) return interaction.reply({ content: 'No hay una encuesta abierta.', ...eph });
+
+  const count = repo.listSuggestions(round.id).length;
+  const confirm = new ButtonBuilder().setCustomId('lepocine:cancel-confirm').setLabel('Sí, cancelar encuesta')
+    .setStyle(ButtonStyle.Danger);
+  return interaction.reply({
+    content: `¿Cancelar la encuesta? Se pierden las ${count} sugerencia${count === 1 ? '' : 's'}. Después podés abrir una nueva con otro día u hora.`,
+    components: [new ActionRowBuilder().addComponents(confirm)],
+    ...eph,
+  });
+}
+
+async function confirmCancel(interaction) {
+  if (!isStaff(interaction)) return interaction.reply(DENIED);
+  await interaction.deferUpdate();
+  const ok = await service.cancelRound(interaction.client);
+  await interaction.editReply({ content: ok ? 'Encuesta cancelada.' : 'No había una encuesta abierta.', components: [] });
 }
 
 async function handle(interaction) {
   switch (interaction.customId) {
+    case 'lepocine:open': return openRoundModal(interaction);
+    case 'lepocine:open-modal': return submitOpenRound(interaction);
     case 'lepocine:suggest': return openSuggestModal(interaction);
     case 'lepocine:suggest-modal': return submitSuggestion(interaction);
     case 'lepocine:pick': return openPickMenu(interaction);
     case 'lepocine:pick-select': return submitPick(interaction);
+    case 'lepocine:cancel': return askCancel(interaction);
+    case 'lepocine:cancel-confirm': return confirmCancel(interaction);
     default: return undefined;
   }
 }

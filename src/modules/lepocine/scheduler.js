@@ -1,29 +1,22 @@
 const cron = require('node-cron');
-const { Events } = require('discord.js');
 const cfg = require('./config');
 const service = require('./service');
-const { nextFriday } = require('./time');
 
 const log = (e) => console.error('[lepocine]', e);
 
 function start(client) {
-  if (!cfg.channelId) {
-    console.warn('[lepocine] falta LEPOCINE_CHANNEL_ID en el .env: el módulo queda inactivo');
+  if (!cfg.channelId || !cfg.staffChannelId) {
+    console.warn('[lepocine] faltan el canal público (LEPOCINE_CHANNEL_ID) o el del equipo (staffChannelId): módulo inactivo');
     return;
   }
   const opts = { timezone: cfg.TZ };
 
-  // Lunes: panel nuevo
-  cron.schedule(`0 ${cfg.panelHour} * * 1`, () => service.newWeek(client).catch(log), opts);
-  // Miércoles: crea el evento (o avisa al equipo si nadie eligió)
-  cron.schedule(`0 ${cfg.eventHour} * * 3`, () => service.processWeek(client, { warnIfMissing: true }).catch(log), opts);
+  // Lunes: llega al canal del equipo el aviso para abrir la encuesta
+  cron.schedule(`0 ${cfg.mondayHour} * * 1`, () => service.mondayPrompt(client).catch(log), opts);
+  // Todos los días: recordatorio para elegir película (solo si hay sugerencias sin elegir)
+  cron.schedule(`0 ${cfg.reminderHour} * * *`, () => service.dailyReminder(client).catch(log), opts);
 
-  // Si el bot estuvo caído el miércoles, lo recupera al arrancar
-  client.once(Events.ClientReady, () => {
-    if (Date.now() >= nextFriday().cutoffMs) service.processWeek(client).catch(log);
-  });
-
-  console.log(`[lepocine] panel: lunes ${cfg.panelHour}:00 · evento: miércoles ${cfg.eventHour}:00 (${cfg.TZ})`);
+  console.log(`[lepocine] aviso: lunes ${cfg.mondayHour}:00 · recordatorio: todos los días ${cfg.reminderHour}:00 (${cfg.TZ})`);
 }
 
 module.exports = { start };
