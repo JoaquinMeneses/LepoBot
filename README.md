@@ -1,6 +1,6 @@
 # LepoBot
 
-Bot de Discord para las actividades de la comunidad: cumpleaños y organización de películas con Lepocine. El proyecto usa ES modules y todos sus comandos slash comienzan con `lc-` para distinguirlos de los de otros bots.
+Bot de Discord para las actividades de la comunidad: cumpleaños y organización de películas con Lepocine, copypastas y rol por etiqueta del servidor. El proyecto usa ES modules y todos sus comandos slash comienzan con `lc-` para distinguirlos de los de otros bots.
 
 ## Módulos
 
@@ -9,6 +9,7 @@ Bot de Discord para las actividades de la comunidad: cumpleaños y organización
 | `birthdays`   | Disponible      | Registro de cumpleaños y saludo automático diario                                |
 | `lepocine`    | Disponible      | Película de la comunidad: encuesta de sugerencias, elección y evento automático  |
 | `copypastas`  | Disponible      | Copia al canal de copypastas los mensajes marcados con un emoji y los deja votar |
+| `tagrole`     | Disponible      | Da un rol a quien muestra la etiqueta del servidor y se lo quita si la deja      |
 | `debug`       | Solo desarrollo | Comandos de prueba; todos usan el prefijo `lc-debug-`                            |
 | `tournaments` | Planeado        | Torneos internos de LoL                                                          |
 
@@ -88,6 +89,37 @@ Lo que se configura desde el panel se guarda en la base de datos y tiene priorid
 
 **Intent privilegiado:** para leer el texto de los mensajes reaccionados, el bot necesita el **Message Content Intent**. Hay que activarlo en el Developer Portal (pestaña **Bot** → _Privileged Gateway Intents_). Sin eso, el bot no arranca (`Used disallowed intents`) o copia mensajes vacíos.
 
+### Rol por etiqueta del servidor (`tagrole`)
+
+El bot da un rol a quien muestra la etiqueta de este servidor (la de 4 letras que aparece junto al nombre) y se lo quita si la deja de mostrar.
+
+**Cómo se entera:** Discord le avisa al bot por el Gateway (la conexión WebSocket que ya usa) cada vez que cambia un miembro, y ese aviso incluye su etiqueta. Como discord.js no emite su evento `guildMemberUpdate` cuando solo cambia la etiqueta, el módulo escucha el evento crudo `GUILD_MEMBER_UPDATE`. Una persona "tiene la etiqueta" si la de su perfil es la de este servidor **y** la tiene activada.
+
+**Qué hace**
+- **Tiempo real:** al activar la etiqueta, la persona recibe el rol. Al desactivarla o cambiarla por la de otro servidor, el bot se lo quita.
+- **Barrido:** al arrancar, a pedido desde el panel y todos los días a las 4:00, el bot recorre los miembros y corrige las diferencias. Cubre lo que pasó mientras estaba apagado. Pide la lista cruda a la API, sin llenar la caché de memoria.
+- **Solo quita lo que dio:** el bot recuerda a quién le dio el rol y solo se lo quita a esas personas. Los roles asignados a mano no se tocan.
+- **Sin dato, no actúa:** si Discord no manda la etiqueta de alguien, el bot no le agrega ni le quita nada.
+- Se ignoran los bots.
+
+**Panel de configuración:** `/lc-tagrole panel` (requiere _Gestionar servidor_) publica en el canal del equipo un panel que solo usan los roles del equipo (`staffRoleIds` global):
+
+| Control                                 | Qué hace                                                                                  |
+| --------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **Pausar / Activar**                    | Detiene o reanuda el módulo (al reactivarlo hace un barrido)                              |
+| **Quitar el rol al perder la etiqueta** | Sí / No                                                                                   |
+| **Sincronizar ahora**                   | Hace el barrido en el momento y muestra el resultado                                      |
+| **Selector de rol**                     | Cambia el rol que se asigna (hace un barrido). El rol anterior no se modifica             |
+
+El panel muestra el estado, el rol, la opción de quitar y el resultado del último barrido (con etiqueta, con el rol, agregados y quitados).
+
+**Configuración** (`src/modules/tagrole/config.js`): `defaultRoleId`, `defaultRemoveOnLoss`, `dailySyncHour` (`null` desactiva el barrido diario) y `pageSize`. Lo guardado desde el panel tiene prioridad.
+
+**Requisitos**
+- **Server Members Intent** activado en el Developer Portal (pestaña **Bot** → _Privileged Gateway Intents_), en cada aplicación (desarrollo y producción). Sin eso el bot no arranca (`Used disallowed intents`).
+- Permiso **Gestionar roles** para el bot, y que el rol del bot esté **por encima** del rol que asigna en la lista de roles. El rol no puede estar gestionado por una integración.
+- El servidor debe tener las etiquetas habilitadas y la persona haberla elegido y mostrarla.
+
 ## Stack
 
 - [Node.js](https://nodejs.org) **22.13 o superior**
@@ -114,7 +146,7 @@ Para comprobar si alguien es del equipo, los módulos usan `isStaff(interaction)
 
 1. Entrá al [Developer Portal](https://discord.com/developers/applications) y creá una aplicación.
 2. En la pestaña **Bot**, usá **Reset Token** y copiá el token (se muestra una sola vez).
-3. En la misma pestaña **Bot**, en _Privileged Gateway Intents_, activá **Message Content Intent** (lo necesita el módulo de copypastas para leer los mensajes).
+3. En la misma pestaña **Bot**, en _Privileged Gateway Intents_, activá **Message Content Intent** (lo necesita copypastas para leer los mensajes) y **Server Members Intent** (lo necesita tagrole para ver las etiquetas de los miembros).
 4. En **OAuth2 → URL Generator**, marcá los scopes `bot` y `applications.commands` y los permisos indicados en cada módulo.
 5. Abrí la URL generada e invitá el bot a tu servidor.
 
@@ -159,6 +191,15 @@ src/
 │   └── deploy-commands.js    # Registro de slash commands
 └── modules/
     ├── birthdays/            # Cumpleaños
+    ├── tagrole/
+    │   ├── index.js          # Definición del módulo
+    │   ├── config.js         # Rol por defecto y barrido diario
+    │   ├── repo.js           # Tablas y acceso a datos
+    │   ├── service.js        # Estado de la etiqueta, cambios de rol y barrido
+    │   ├── events.js         # Evento crudo del Gateway, arranque y barrido diario
+    │   ├── panel.js          # Panel de configuración
+    │   ├── components.js     # Botones y selector de rol
+    │   └── command.js        # /lc-tagrole
     ├── copypastas/
     │   ├── index.js          # Definición del módulo
     │   ├── config.js         # Emoji, canal y votos por defecto

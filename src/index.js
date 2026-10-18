@@ -15,6 +15,9 @@ const client = new Client({
     // MessageContent es un intent privilegiado: hay que activarlo en el Developer Portal.
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.MessageContent,
+    // Tagrole: eventos de miembros (incluida la etiqueta del servidor) y lista de miembros.
+    // GuildMembers es un intent privilegiado: hay que activarlo en el Developer Portal.
+    GatewayIntentBits.GuildMembers,
   ],
   // Permite recibir reacciones en mensajes que el bot no tiene en caché
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
