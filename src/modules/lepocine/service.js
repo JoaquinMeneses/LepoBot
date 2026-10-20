@@ -22,8 +22,8 @@ async function fetchChannel(client, id) {
   }
 }
 
-const getChannel = (client) => fetchChannel(client, cfg.channelId);          // canal público
-const getStaffChannel = (client) => fetchChannel(client, cfg.staffChannelId); // canal del equipo
+export const getChannel = (client) => fetchChannel(client, cfg.channelId);          // canal público
+export const getStaffChannel = (client) => fetchChannel(client, cfg.staffChannelId); // canal del equipo
 
 // ---------- Paneles ----------
 
@@ -133,7 +133,7 @@ async function repostOne(channel, kind, { content, ping = false } = {}) {
 }
 
 /** Refresca los dos paneles. El público solo se edita si ya existe; el del equipo siempre queda publicado. */
-async function updatePanels(client) {
+export async function updatePanels(client) {
   const pub = await getChannel(client);
   if (pub) await updateOne(pub, 'public', false).catch((e) => console.error('[lepocine] panel público:', e.message));
   const staff = await getStaffChannel(client);
@@ -143,7 +143,7 @@ async function updatePanels(client) {
 // ---------- Encuesta ----------
 
 /** Abre una encuesta: publica el panel público nuevo y actualiza el del equipo. */
-async function openRound(client, { theme, startMs, endMs, openedBy }) {
+export async function openRound(client, { theme, startMs, endMs, openedBy }) {
   const pub = await getChannel(client);
   if (!pub) throw new Error('No encuentro el canal público de Lepocine');
 
@@ -153,7 +153,7 @@ async function openRound(client, { theme, startMs, endMs, openedBy }) {
   return pub;
 }
 
-async function cancelRound(client) {
+export async function cancelRound(client) {
   const pub = await getChannel(client);
   if (!pub) return false;
   const round = repo.getOpenRound(pub.guild.id);
@@ -191,7 +191,7 @@ async function createEvent(guild, round, suggestion) {
  * Confirma la película: crea el evento y cierra la encuesta.
  * Si Discord rechaza el evento, lanza el error y no cambia nada (se puede volver a intentar).
  */
-async function finishPick(client, round, suggestion, pickedBy) {
+export async function finishPick(client, round, suggestion, pickedBy) {
   const pub = await getChannel(client);
   if (!pub) throw new Error('No encuentro el canal público de Lepocine');
 
@@ -207,7 +207,7 @@ async function finishPick(client, round, suggestion, pickedBy) {
 // ---------- Avisos ----------
 
 /** Lunes: llega el mensaje al canal del equipo para abrir la encuesta. */
-async function mondayPrompt(client) {
+export async function mondayPrompt(client) {
   const staff = await getStaffChannel(client);
   if (!staff) return { status: 'no-channel' };
 
@@ -225,7 +225,7 @@ async function mondayPrompt(client) {
  * Recordatorio diario al equipo: hay encuesta abierta, hay sugerencias y falta elegir.
  * No avisa el mismo día en que se abrió la encuesta, salvo force (pruebas).
  */
-async function dailyReminder(client, { force = false } = {}) {
+export async function dailyReminder(client, { force = false } = {}) {
   const pub = await getChannel(client);
   const staff = await getStaffChannel(client);
   if (!pub || !staff) return { status: 'no-channel' };
@@ -247,7 +247,7 @@ async function dailyReminder(client, { force = false } = {}) {
 }
 
 /** Solo para pruebas: borra la última encuesta (y su evento, si lo tiene) y refresca los paneles. */
-async function resetLast(client) {
+export async function resetLast(client) {
   const pub = await getChannel(client);
   if (!pub) return { status: 'no-channel' };
 
@@ -267,16 +267,9 @@ async function resetLast(client) {
 }
 
 /** Publica un panel nuevo en el canal del equipo (sin mención). */
-async function repostStaffPanel(client) {
+export async function repostStaffPanel(client) {
   const staff = await getStaffChannel(client);
   if (!staff) return null;
   await repostOne(staff, 'staff');
   return staff;
 }
-
-export {
-  getChannel, getStaffChannel,
-  updatePanels, repostStaffPanel,
-  openRound, cancelRound, finishPick,
-  mondayPrompt, dailyReminder, resetLast,
-};

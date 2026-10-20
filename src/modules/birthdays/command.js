@@ -11,7 +11,7 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
-import repo from './repo.js';
+import * as repo from './repo.js';
 import { daysInMonth, daysUntil } from './dates.js';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',

@@ -4,7 +4,7 @@ import * as service from './service.js';
 
 const log = (e) => console.error('[lepocine]', e);
 
-function start(client) {
+export function start(client) {
   if (!cfg.channelId || !cfg.staffChannelId) {
     console.warn('[lepocine] faltan el canal público (LEPOCINE_CHANNEL_ID) o el del equipo (staffChannelId): módulo inactivo');
     return;
@@ -18,5 +18,3 @@ function start(client) {
 
   console.log(`[lepocine] aviso: lunes ${cfg.mondayHour}:00 · recordatorio: todos los días ${cfg.reminderHour}:00 (${cfg.TZ})`);
 }
-
-export { start };

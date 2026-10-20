@@ -183,7 +183,7 @@ async function confirmCancel(interaction) {
   await interaction.editReply({ content: ok ? 'Encuesta cancelada.' : 'No había una encuesta abierta.', components: [] });
 }
 
-async function handle(interaction) {
+export async function handle(interaction) {
   switch (interaction.customId) {
     case 'lepocine:open': return openRoundModal(interaction);
     case 'lepocine:open-modal': return submitOpenRound(interaction);
@@ -196,5 +196,3 @@ async function handle(interaction) {
     default: return undefined;
   }
 }
-
-export { handle };

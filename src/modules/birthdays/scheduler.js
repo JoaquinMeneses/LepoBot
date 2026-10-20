@@ -1,8 +1,8 @@
 import cron from 'node-cron';
-import repo from './repo.js';
+import * as repo from './repo.js';
 import { TZ, todayInTZ, matchesDate } from './dates.js';
 
-async function announceToday(client) {
+export async function announceToday(client) {
   const today = todayInTZ();
 
   for (const { guild_id, birthday_channel_id } of repo.guildChannels()) {
@@ -22,10 +22,8 @@ async function announceToday(client) {
   }
 }
 
-function start(client) {
+export function start(client) {
   const hour = 9;
   cron.schedule(`0 ${hour} * * *`, () => announceToday(client), { timezone: TZ });
   console.log(`[cumples] saludos diarios a las ${hour}:00 (${TZ})`);
 }
-
-export { start, announceToday };

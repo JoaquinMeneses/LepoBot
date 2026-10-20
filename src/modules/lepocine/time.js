@@ -1,7 +1,7 @@
 import cfg from './config.js';
 
 // Fecha/hora "de pared" de un instante en una zona horaria
-function partsInTZ(epochMs, tz = cfg.TZ) {
+export function partsInTZ(epochMs, tz = cfg.TZ) {
   const p = new Intl.DateTimeFormat('en-CA', {
     timeZone: tz, hourCycle: 'h23',
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
@@ -16,7 +16,7 @@ function offsetMs(epochMs, tz) {
 }
 
 // Instante UTC (ms) que corresponde a una fecha/hora de pared en la zona horaria
-function zonedEpoch(y, m, d, h, min, tz = cfg.TZ) {
+export function zonedEpoch(y, m, d, h, min, tz = cfg.TZ) {
   const guess = Date.UTC(y, m - 1, d, h, min);
   let e = guess - offsetMs(guess, tz);
   e = guess - offsetMs(e, tz); // segunda pasada por si hay cambio de horario
@@ -26,7 +26,7 @@ function zonedEpoch(y, m, d, h, min, tz = cfg.TZ) {
 const pad = (n) => String(n).padStart(2, '0');
 
 /** 'YYYY-MM-DD' de un instante, en la zona horaria del bot. */
-function dateKey(epochMs) {
+export function dateKey(epochMs) {
   const p = partsInTZ(epochMs);
   return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
 }
@@ -38,7 +38,7 @@ const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,
 const WEEKDAYS = { domingo: 0, lunes: 1, martes: 2, miercoles: 3, jueves: 4, viernes: 5, sabado: 6 };
 
 /** "21", "21:00", "21.30", "21h", "21hs", "21h30" -> { hour, minute } */
-function parseTime(text) {
+export function parseTime(text) {
   const m = norm(text).match(/^(\d{1,2})(?:[:.h]?(\d{2}))?\s*(?:hs?|hrs?)?$/);
   if (!m) return null;
   const hour = Number(m[1]);
@@ -58,7 +58,7 @@ const validDate = (y, m, d) => {
  *   hora: "21" | "21:00" | "21h30"
  * Devuelve { ok: true, startMs, endMs } o { ok: false, error }.
  */
-function resolveStart(dayText, timeText, nowMs = Date.now()) {
+export function resolveStart(dayText, timeText, nowMs = Date.now()) {
   const time = parseTime(timeText);
   if (!time) return { ok: false, error: 'No entendí la hora. Probá con `21:00` o `21`.' };
 
@@ -106,5 +106,3 @@ function resolveStart(dayText, timeText, nowMs = Date.now()) {
   }
   return { ok: true, startMs, endMs: startMs + cfg.durationMinutes * 60_000 };
 }
-
-export { partsInTZ, zonedEpoch, dateKey, parseTime, resolveStart };

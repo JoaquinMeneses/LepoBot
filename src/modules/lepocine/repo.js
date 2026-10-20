@@ -63,18 +63,18 @@ const q = {
 const normalize = (t) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
 
 /** Encuesta abierta del servidor. Si su fecha ya pasó sin elegir película, la marca como vencida. */
-function getOpenRound(guildId, nowMs = Date.now()) {
+export function getOpenRound(guildId, nowMs = Date.now()) {
   q.expire.run(guildId, nowMs);
   return q.getOpen.get(guildId) ?? null;
 }
 
-function openRound(guildId, { theme, startMs, endMs, openedBy }) {
+export function openRound(guildId, { theme, startMs, endMs, openedBy }) {
   const r = q.insertRound.run(guildId, theme ?? null, startMs, endMs, openedBy, Date.now());
   return Number(r.lastInsertRowid);
 }
 
 /** Una sugerencia por persona: si ya tenía una en esta encuesta, se reemplaza. */
-function addSuggestion(roundId, userId, userName, title) {
+export function addSuggestion(roundId, userId, userName, title) {
   const key = normalize(title);
   const all = q.listSug.all(roundId);
 
@@ -90,12 +90,11 @@ function addSuggestion(roundId, userId, userName, title) {
 }
 
 /** Borra una encuesta y sus sugerencias. */
-function deleteRound(roundId) {
+export function deleteRound(roundId) {
   q.deleteSugByRound.run(roundId);
   q.deleteRound.run(roundId);
 }
 
-export { getOpenRound, openRound, deleteRound, addSuggestion };
 export const getLastRound = (guildId) => q.getLast.get(guildId) ?? null;
 export const setRoundStatus = (roundId, status) => q.setStatus.run(status, roundId);
 export const finishRound = (roundId, title, suggestedBy, pickedBy, eventId) =>

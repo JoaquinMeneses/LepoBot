@@ -3,14 +3,14 @@ import * as service from './service.js';
 
 // Comando solo de administración: el equipo y la comunidad usan los botones de los paneles.
 // (Los comandos de prueba viven en el módulo `debug`.)
-const data = new SlashCommandBuilder()
+export const data = new SlashCommandBuilder()
   .setName('lc-lepocine')
   .setDescription('Administración de Lepocine')
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .setContexts(0)
   .addSubcommand((s) => s.setName('panel').setDescription('Publica de nuevo el panel del equipo en su canal'));
 
-async function execute(interaction) {
+export async function execute(interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const staff = await service.repostStaffPanel(interaction.client);
@@ -19,5 +19,3 @@ async function execute(interaction) {
   }
   return interaction.editReply(`Panel publicado en ${staff}.`);
 }
-
-export { data, execute };

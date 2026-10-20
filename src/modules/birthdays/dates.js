@@ -1,11 +1,11 @@
 import config from '../../core/config.js';
 
-const TZ = config.TZ;
+export const TZ = config.TZ;
 
-const isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
-const daysInMonth = (m, y = 2000) => new Date(Date.UTC(y, m, 0)).getUTCDate(); // 2000 = bisiesto (permite 29/02)
+export const isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+export const daysInMonth = (m, y = 2000) => new Date(Date.UTC(y, m, 0)).getUTCDate(); // 2000 = bisiesto (permite 29/02)
 
-function todayInTZ(tz = TZ) {
+export function todayInTZ(tz = TZ) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
   }).formatToParts(new Date());
@@ -19,7 +19,7 @@ function occurrence(day, month, year) {
   return Date.UTC(year, month - 1, day);
 }
 
-function daysUntil(day, month) {
+export function daysUntil(day, month) {
   const t = todayInTZ();
   const today = Date.UTC(t.year, t.month - 1, t.day);
   let next = occurrence(day, month, t.year);
@@ -28,8 +28,6 @@ function daysUntil(day, month) {
 }
 
 // ¿Este cumpleaños cae en la fecha dada?
-function matchesDate(b, { year, month, day }) {
+export function matchesDate(b, { year, month, day }) {
   return occurrence(b.day, b.month, year) === Date.UTC(year, month - 1, day);
 }
-
-export { TZ, isLeap, daysInMonth, todayInTZ, daysUntil, matchesDate };

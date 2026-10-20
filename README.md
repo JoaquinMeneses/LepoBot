@@ -246,6 +246,18 @@ Convenciones del proyecto:
 - Todo acceso a la base va en un `repo.js` dentro del módulo, nunca directo desde los comandos.
 - Un módulo puede crear sus propias tablas en su `repo.js` con `CREATE TABLE IF NOT EXISTS` (como hace `lepocine`).
 
+### Convención de exports
+
+Todos los archivos de `src/` siguen la misma regla:
+
+- **Exports con nombre, declarados en el lugar de la definición**: `export const data = ...`, `export function execute(...) {}`, `export const getSettings = ...`. No se usan bloques `export { ... }` al final del archivo.
+- **`export default` solo cuando el archivo representa un único valor**:
+  - `src/modules/*/index.js`: la definición del módulo que carga el loader.
+  - `src/modules/*/config.js` y `src/core/config.js`: el objeto de configuración.
+  - `src/core/db.js`: la conexión única a SQLite.
+
+Al importar, se usa el espacio de nombres cuando se consume más de una función (`import * as repo from './repo.js'` → `repo.getSettings(...)`) y el import con nombres cuando se usan pocas (`import { isStaff } from '../../core/permissions.js'`). Los `repo.js` y `service.js` nunca se importan por defecto.
+
 ## Comandos de prueba (`debug`)
 
 | Comando               | Descripción                                      |
