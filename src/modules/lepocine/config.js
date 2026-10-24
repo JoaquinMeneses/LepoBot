@@ -23,6 +23,10 @@ export default {
   // Todos los días: hora del recordatorio para elegir película (si hay sugerencias sin elegir)
   reminderHour: 12,
 
+  // Al abrir la encuesta, el bot menciona a @everyone en el canal público para avisar a la comunidad.
+  // Necesita el permiso "Mencionar @everyone, @here y todos los roles" en ese canal.
+  mentionEveryoneOnOpen: true,
+
   // El menú de selección de Discord admite 25 opciones como máximo
   maxSuggestions: 25,
   // La fecha de la película no puede estar más lejos que esto

@@ -53,11 +53,17 @@ async function submitOpenRound(interaction) {
   const theme = clean(interaction.fields.getTextInputValue('theme'), 100) || null;
 
   await interaction.deferReply(eph);
-  const pub = await service.openRound(interaction.client, {
+  const { channel: pub, mentioned, canMention } = await service.openRound(interaction.client, {
     theme, startMs: r.startMs, endMs: r.endMs, openedBy: interaction.user.id,
   });
+
+  let notice = '';
+  if (mentioned && canMention) notice = '\n📣 Avisé a la comunidad con @everyone.';
+  if (mentioned && !canMention) {
+    notice = '\n⚠️ No pude avisar con @everyone: al bot le falta el permiso *Mencionar @everyone, @here y todos los roles* en ese canal. La encuesta quedó publicada igual.';
+  }
   await interaction.editReply(
-    `✅ Encuesta abierta para <t:${Math.floor(r.startMs / 1000)}:F>${theme ? ` · temática: **${esc(theme)}**` : ''}.\nEl panel para sugerir ya está en ${pub}.`,
+    `✅ Encuesta abierta para <t:${Math.floor(r.startMs / 1000)}:F>${theme ? ` · temática: **${esc(theme)}**` : ''}.\nEl panel para sugerir ya está en ${pub}.${notice}`,
   );
 }
 

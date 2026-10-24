@@ -1,5 +1,5 @@
 import {
-  EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, escapeMarkdown,
+  EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, escapeMarkdown, PermissionFlagsBits,
   GuildScheduledEventPrivacyLevel, GuildScheduledEventEntityType,
 } from 'discord.js';
 import cfg from './config.js';
@@ -115,7 +115,7 @@ async function updateOne(channel, kind, createIfMissing) {
 }
 
 /** Borra el panel anterior y publica uno nuevo (llega como mensaje nuevo, con notificación). */
-async function repostOne(channel, kind, { content, ping = false } = {}) {
+async function repostOne(channel, kind, { content, ping = false, mentionEveryone = false } = {}) {
   const guildId = channel.guild.id;
   const saved = repo.getPanel(guildId, kind);
   if (saved) {
@@ -127,6 +127,7 @@ async function repostOne(channel, kind, { content, ping = false } = {}) {
   const payload = buildPanel(guildId, kind);
   if (content) payload.content = content;
   if (ping) payload.allowedMentions = { roles: cfg.staffRoleIds };
+  if (mentionEveryone) payload.allowedMentions = { parse: ['everyone'] };
 
   const msg = await channel.send(payload);
   repo.setPanel(guildId, kind, channel.id, msg.id);
@@ -142,15 +143,37 @@ export async function updatePanels(client) {
 
 // ---------- Encuesta ----------
 
-/** Abre una encuesta: publica el panel público nuevo y actualiza el del equipo. */
+/** ¿Puede el bot mencionar @everyone en este canal? Sin ese permiso la mención no notifica a nadie. */
+async function canMentionEveryone(channel) {
+  try {
+    const me = await channel.guild.members.fetchMe();
+    return Boolean(channel.permissionsFor(me)?.has(PermissionFlagsBits.MentionEveryone));
+  } catch {
+    return false; // si no se puede comprobar, la encuesta se abre igual, sin el aviso
+  }
+}
+
+/**
+ * Abre una encuesta: publica el panel público nuevo (avisando con @everyone si está activado)
+ * y actualiza el del equipo. Devuelve { channel, mentioned, canMention }.
+ */
 export async function openRound(client, { theme, startMs, endMs, openedBy }) {
   const pub = await getChannel(client);
   if (!pub) throw new Error('No encuentro el canal público de Lepocine');
 
   repo.openRound(pub.guild.id, { theme, startMs, endMs, openedBy });
-  await repostOne(pub, 'public');
+
+  const wantsMention = cfg.mentionEveryoneOnOpen;
+  const canMention = wantsMention ? await canMentionEveryone(pub) : false;
+  if (wantsMention && !canMention) {
+    console.warn(`[lepocine] el bot no tiene "Mencionar @everyone" en el canal ${pub.id}: la encuesta se publica sin aviso`);
+  }
+
+  // El texto del aviso lo arma el bot (sin texto escrito por usuarios) para que no se cuelen menciones
+  const content = `${canMention ? '@everyone ' : ''}🎬 **¡Se abrió la encuesta de Lepocine!** Sugerí la película del ${when({ start_ms: startMs })}`;
+  await repostOne(pub, 'public', wantsMention ? { content, mentionEveryone: canMention } : {});
   await updatePanels(client);
-  return pub;
+  return { channel: pub, mentioned: wantsMention, canMention };
 }
 
 export async function cancelRound(client) {
