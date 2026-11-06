@@ -1,6 +1,6 @@
 # LepoBot
 
-Bot de Discord para las actividades de la comunidad: cumpleaños y organización de películas con Lepocine, copypastas y rol por etiqueta del servidor. El proyecto usa ES modules y todos sus comandos slash comienzan con `lc-` para distinguirlos de los de otros bots.
+Bot de Discord para las actividades de la comunidad: cumpleaños, organización de películas con Lepocine, copypastas, rol por etiqueta del servidor y notas de parche de League of Legends. El proyecto usa ES modules y todos sus comandos slash comienzan con `lc-` para distinguirlos de los de otros bots.
 
 ## Módulos
 
@@ -8,6 +8,7 @@ Bot de Discord para las actividades de la comunidad: cumpleaños y organización
 | ------------- | --------------- | -------------------------------------------------------------------------------- |
 | `birthdays`   | Disponible      | Registro de cumpleaños y saludo automático diario                                |
 | `lepocine`    | Disponible      | Película de la comunidad: encuesta de sugerencias, elección y evento automático  |
+| `patchnotes`  | Disponible      | Últimas notas de parche de LoL con título, resumen e imagen                      |
 | `copypastas`  | Disponible      | Copia al canal de copypastas los mensajes marcados con un emoji y los deja votar |
 | `tagrole`     | Disponible      | Da un rol a quien muestra la etiqueta del servidor y se lo quita si la deja      |
 | `debug`       | Solo desarrollo | Comandos de prueba; todos usan el prefijo `lc-debug-`                            |
@@ -28,7 +29,7 @@ Los nacidos el 29/02 se saludan el 28/02 en los años no bisiestos.
 
 ### Lepocine
 
-La comunidad ve películas juntos. Todo se maneja con paneles de botones, sin comandos. Hay dos canales: uno **público** (donde la comunidad sugiere) y uno del **equipo** (donde se abre la encuesta y se elige la película).
+La comunidad ve películas juntos. Todo se maneja con paneles de botones; el único comando es el de administración para republicar el panel del equipo. Hay dos canales: uno **público** (donde la comunidad sugiere) y uno del **equipo** (donde se abre la encuesta y se elige la película).
 
 **Ciclo de una encuesta**
 
@@ -37,7 +38,7 @@ La comunidad ve películas juntos. Todo se maneja con paneles de botones, sin co
    - **Día de la película:** `viernes`, `mañana`, `hoy` o una fecha como `17/10`. Viene precargado con `viernes`.
    - **Hora:** `21`, `21:00`, `21h30`. Viene precargada con `21:00`.
    - **Temática para sugerir** (opcional): por ejemplo `terror` o `años 90`.
-3. El bot publica en el canal público un panel nuevo con el día, la hora y la temática, y un botón **➕ Sugerir película**. Cada persona tiene una sugerencia activa (si sugiere de nuevo, reemplaza la anterior) y no se aceptan títulos repetidos. Máximo 25 sugerencias.
+3. El bot publica en el canal público un panel nuevo con el día, la hora y la temática, y un botón **➕ Sugerir película**. Cada persona tiene una sugerencia activa (si sugiere de nuevo, reemplaza la anterior) y no se aceptan títulos repetidos. Máximo 25 sugerencias. Al abrir la encuesta el bot menciona `@everyone` en el canal público; si no tiene permiso para hacerlo, publica el panel sin el aviso.
 4. En el canal del equipo el mismo panel cambia a **🎞️ Elegir película** y **✖️ Cancelar encuesta** (con confirmación, por si se escribió mal el día o la hora).
 5. Al elegir una película, el bot **crea el evento del servidor** (`Lepocine: "Película"`, con la temática y quién la sugirió en la descripción), anuncia el enlace en el canal público y cierra la encuesta.
 
@@ -53,17 +54,43 @@ Los roles se verifican siempre al hacer clic: aunque todos vean los botones del 
 
 **Configuración** (`src/modules/lepocine/config.js`). El canal y los roles del equipo son globales y se configuran en `src/core/config.js` (ver _Configuración global_):
 
-| Opción                        | Descripción                                                |
-| ----------------------------- | ---------------------------------------------------------- |
-| `location`                    | Ubicación (texto) del evento                               |
-| `defaultDay` / `defaultTime`  | Valores precargados en el formulario                       |
-| `durationMinutes`             | Duración del evento (por defecto 165 = 2 h 45 min)         |
-| `mondayHour` / `reminderHour` | Hora del aviso del lunes y del recordatorio diario         |
-| `maxDaysAhead`                | Máximo de días hacia adelante para la fecha de la película |
+| Opción                        | Descripción                                                          |
+| ----------------------------- | -------------------------------------------------------------------- |
+| `location`                    | Ubicación (texto) del evento                                         |
+| `defaultDay` / `defaultTime`  | Valores precargados en el formulario                                 |
+| `durationMinutes`             | Duración del evento (por defecto 165 = 2 h 45 min)                   |
+| `mondayHour` / `reminderHour` | Hora del aviso del lunes y del recordatorio diario                   |
+| `maxDaysAhead`                | Máximo de días hacia adelante para la fecha de la película           |
+| `maxSuggestions`              | Máximo de sugerencias por encuesta (25, el tope del menú de Discord) |
+| `mentionEveryoneOnOpen`       | Avisar con `@everyone` en el canal público al abrir la encuesta      |
 
 El canal público se define con `LEPOCINE_CHANNEL_ID` en el `.env`. Si preferís un canal de voz en lugar de una ubicación de texto, definí `LEPOCINE_VOICE_CHANNEL_ID`.
 
-**Permisos del bot:** en ambos canales, _Ver canal_, _Enviar mensajes_ e _Insertar enlaces_; en el servidor, _Crear eventos_ y _Gestionar eventos_. Para que las menciones a los roles notifiquen, los roles deben ser mencionables o el bot necesita el permiso de mencionar roles.
+**Permisos del bot:** en ambos canales, _Ver canal_, _Enviar mensajes_ e _Insertar enlaces_; en el canal público, _Mencionar @everyone, @here y todos los roles_ si querés el aviso al abrir la encuesta; en el servidor, _Crear eventos_ y _Gestionar eventos_. Para que las menciones a los roles notifiquen, los roles deben ser mencionables o el bot necesita el permiso de mencionar roles.
+
+### Notas de parche (`patchnotes`)
+
+`/lc-parche` publica la última nota de parche de League of Legends en español (LAS): título, resumen, imagen y un botón para leer la nota completa. No necesita configuración ni permisos especiales, y no guarda nada en la base.
+
+| Comando      | Descripción                                                    |
+| ------------ | -------------------------------------------------------------- |
+| `/lc-parche` | Muestra las últimas notas de la versión de League of Legends   |
+
+**Cómo elige la nota:** lee el listado de notas de Riot (`es-mx`), se queda con el parche de mayor número de versión —no con el primero de la página— y descarta las notas de TFT, que son otro producto.
+
+**Cómo elige la imagen:** si la nota tiene una imagen de resumen arriba (las secciones _Versión en breve_ o _Lo mejor de la versión_), usa esa. Si no, usa la imagen por defecto del artículo (`og:image`). La detección es estructural, no por título: toma la primera imagen de al menos 1200 px de ancho dentro de las dos primeras secciones del artículo, salteando los iconos de campeón, hechizo y las fotos de autor. Así sigue funcionando cuando Riot cambia el nombre de la sección.
+
+**Caché:** la respuesta se guarda en memoria 30 minutos, así que muchos usos del comando no golpean la web de Riot. Si Riot falla y existe una copia anterior, se responde con esa.
+
+**Configuración** (`src/modules/patchnotes/config.js`):
+
+| Opción           | Descripción                                                    |
+| ---------------- | -------------------------------------------------------------- |
+| `listUrl`        | Página de Riot con el listado de notas de parche               |
+| `cacheMinutes`   | Minutos que se conserva la respuesta en memoria (30)           |
+| `timeoutMs`      | Espera máxima por cada pedido a Riot (8000)                    |
+| `userAgent`      | User-Agent con el que el bot se identifica ante Riot           |
+| `maxDescription` | Largo máximo del resumen que se muestra en el embed (400)      |
 
 ### Copypastas
 
@@ -126,6 +153,7 @@ El panel muestra el estado, el rol, la opción de quitar y el resultado del últ
 - [discord.js](https://discord.js.org) v14
 - SQLite integrado de Node (`node:sqlite`), sin dependencias nativas que compilar
 - [node-cron](https://github.com/node-cron/node-cron) para las tareas programadas
+- `node:test`, el runner que trae Node, para las pruebas (sin frameworks extra)
 - Proyecto nativo ES modules (`"type": "module"`); `.env` se carga con `process.loadEnvFile()` sin dotenv
 
 ## Configuración global
@@ -175,7 +203,18 @@ El archivo `.env` es opcional si las variables ya están definidas en el entorno
 npm run deploy   # registra los slash commands (repetir al cambiar su definición)
 npm start        # arranca el bot
 npm run dev      # arranca con recarga automática al guardar el código (los cambios del .env requieren reiniciar)
+npm test         # corre las pruebas
 ```
+
+## Pruebas
+
+```bash
+npm test
+```
+
+Usa el runner integrado de Node (`node --test`) sobre los archivos `*.test.js` de `src/`. Hoy cubre la selección de imagen de las notas de parche (`src/modules/patchnotes/service.test.js`), que es la parte del proyecto con reglas que no se ven a simple vista.
+
+Para un módulo nuevo, agregá un `<archivo>.test.js` al lado del código y corré `npm test`. Las pruebas no levantan el bot ni necesitan token: importan las funciones directamente.
 
 ## Estructura
 
@@ -190,7 +229,12 @@ src/
 │   ├── loader.js             # Carga automática de módulos
 │   └── deploy-commands.js    # Registro de slash commands
 └── modules/
-    ├── birthdays/            # Cumpleaños
+    ├── birthdays/
+    │   ├── index.js          # Definición del módulo
+    │   ├── command.js        # /lc-cumple y panel
+    │   ├── dates.js          # Fechas, zona horaria y 29/02
+    │   ├── repo.js           # Tablas y acceso a datos
+    │   └── scheduler.js      # Saludo diario a las 9:00
     ├── tagrole/
     │   ├── index.js          # Definición del módulo
     │   ├── config.js         # Rol por defecto y barrido diario
@@ -218,7 +262,13 @@ src/
     │   ├── components.js     # Botones, formularios y menús
     │   ├── command.js        # /lc-lepocine
     │   └── scheduler.js      # Aviso del lunes y recordatorio diario
-    └── debug/                # Comandos de prueba (ignorado por git)
+    ├── patchnotes/
+    │   ├── index.js          # Definición del módulo
+    │   ├── config.js         # Fuente de Riot, caché y límites
+    │   ├── service.js        # Listado, parseo de la nota e imagen
+    │   ├── command.js        # /lc-parche
+    │   └── service.test.js   # Pruebas de la selección de imagen
+    └── debug/                # Comandos de prueba (solo desarrollo)
 data/
 └── bot.sqlite                # Base de datos (se crea sola, ignorada por git)
 ```
@@ -260,13 +310,13 @@ Al importar, se usa el espacio de nombres cuando se consume más de una función
 
 ## Comandos de prueba (`debug`)
 
-| Comando               | Descripción                                      |
-| --------------------- | ------------------------------------------------ |
-| `/lc-hola`            | Responde un saludo de prueba                     |
-| `/lc-debug-anunciar`  | Fuerza el saludo de cumpleaños de hoy            |
-| `/lc-debug-lunes`     | Simula el aviso del lunes de Lepocine            |
-| `/lc-debug-aviso`     | Fuerza el recordatorio diario de elegir película |
-| `/lc-debug-reiniciar` | Borra la última encuesta de Lepocine y su evento |
+| Comando                           | Descripción                                                              |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| `/lc-hola`                        | Responde un saludo de prueba                                             |
+| `/lc-debug-cumple`                | Fuerza el saludo de cumpleaños de hoy (_Gestionar servidor_)             |
+| `/lc-debug-lepocine-apertura`     | Simula el aviso del lunes para abrir la encuesta (_Gestionar servidor_)  |
+| `/lc-debug-lepocine-recordatorio` | Fuerza el recordatorio diario de elegir película (_Gestionar servidor_)  |
+| `/lc-debug-lepocine-reiniciar`    | Borra la última encuesta de Lepocine y su evento (_Gestionar servidor_)  |
 
 ## Hoja de ruta
 

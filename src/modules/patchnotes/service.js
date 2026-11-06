@@ -21,6 +21,86 @@ export function metaContent(html, prop) {
   return value ? decodeEntities(value).trim() : null;
 }
 
+// ---------- Imagen de la nota de parche ----------
+
+// Las imágenes de resumen que publica Riot son grandes (1920x1080); los iconos de
+// campeón/hechizo y las fotos de autor son chicos y no llevan estas dimensiones.
+const MIN_SUMMARY_WIDTH = 1200;
+
+// La sección de resumen siempre es una de las dos primeras del artículo: a veces Riot
+// antepone "Actualizaciones dentro de la versión".
+const SUMMARY_SECTION_WINDOW = 2;
+
+const IMAGE_EXT = /\.(?:jpe?g|png|webp|gif|avif)$/i;
+const URL_DIMENSIONS = /-(\d{2,5})x(\d{2,5})\.(?:png|jpe?g|webp|avif)(?:$|[?#])/i;
+
+/** Ancho de la imagen: el atributo width o el que viene en el nombre del archivo. */
+function imageWidth(src, attrs) {
+  const attr = Number(attrs.match(/\bwidth=["']?(\d+)/i)?.[1] ?? 0);
+  const fromUrl = Number(src.split('?')[0].match(URL_DIMENSIONS)?.[1] ?? 0);
+  return Math.max(attr, fromUrl);
+}
+
+/** Imágenes de una sección, salteando las que están dentro de un bloque de cambios. */
+function imagesOutsideChangeBlocks(sectionHtml) {
+  const images = [];
+  let divDepth = 0;
+  let blockDepth = -1; // profundidad de divs del patch-change-block abierto, o -1
+
+  for (const m of sectionHtml.matchAll(/<(\/?)(div|img)\b([^>]*)>/gi)) {
+    const [, closing, rawName, attrs] = m;
+
+    if (rawName.toLowerCase() === 'div') {
+      if (closing) {
+        if (blockDepth !== -1 && divDepth === blockDepth) blockDepth = -1;
+        divDepth = Math.max(0, divDepth - 1);
+      } else {
+        divDepth++;
+        if (blockDepth === -1 && /class=["'][^"']*patch-change-block/i.test(attrs)) blockDepth = divDepth;
+      }
+      continue;
+    }
+
+    if (closing || blockDepth !== -1) continue;
+    const src = attrs.match(/\bsrc=["']([^"']+)["']/i)?.[1];
+    if (!src || src.startsWith('data:')) continue;
+    images.push({ src: decodeEntities(src).trim(), width: imageWidth(src, attrs) });
+  }
+  return images;
+}
+
+/** Parte el artículo en secciones de nivel superior (cada <header class="header-primary">). */
+function splitSections(html) {
+  const starts = [...html.matchAll(/<header\s+class=["']header-primary["']/gi)].map((m) => m.index);
+  return starts.map((start, i) => html.slice(start, i + 1 < starts.length ? starts[i + 1] : html.length));
+}
+
+/**
+ * Imagen que resume la versión: la imagen grande de una de las primeras secciones del
+ * artículo. No se busca por título porque Riot lo cambia ("Versión en breve", "Lo mejor
+ * de la versión"). Devuelve null si el artículo no tiene una, para que el que llama use
+ * la imagen por defecto del artículo.
+ */
+export function findSummaryImage(html) {
+  for (const sectionHtml of splitSections(html).slice(0, SUMMARY_SECTION_WINDOW)) {
+    const image = imagesOutsideChangeBlocks(sectionHtml).find((i) => i.width >= MIN_SUMMARY_WIDTH);
+    if (image) return image.src;
+  }
+  return null;
+}
+
+/** Normaliza una URL de imagen; los parámetros de recorte de Riot se descartan. */
+function cleanImageUrl(url, base) {
+  if (!url) return null;
+  try {
+    const u = new URL(url, base);
+    if (IMAGE_EXT.test(u.pathname)) u.search = '';
+    return u.href;
+  } catch {
+    return null;
+  }
+}
+
 // ---------- Interpretar las páginas de Riot ----------
 
 // Enlaces como /es-mx/news/game-updates/league-of-legends-patch-26-22-notes (también el formato viejo notas-de-la-version-12-22)
@@ -53,17 +133,9 @@ export function parsePatchPage(html, url) {
 
   const description = metaContent(html, 'og:description') ?? metaContent(html, 'description') ?? '';
 
-  // La imagen viene con parámetros de recorte (y un "?" duplicado): sin ellos es la imagen original
-  let image = metaContent(html, 'og:image');
-  if (image) {
-    try {
-      const u = new URL(image);
-      u.search = '';
-      image = u.href;
-    } catch {
-      image = null;
-    }
-  }
+  // Primero la imagen de resumen del artículo; si no tiene, se usa la imagen por
+  // defecto del artículo (og:image, sin los parámetros de recorte).
+  const image = cleanImageUrl(findSummaryImage(html) ?? metaContent(html, 'og:image'), url);
 
   const canonical = metaContent(html, 'og:url') ?? url;
   return { title, description, image, url: canonical };
