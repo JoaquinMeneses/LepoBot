@@ -12,6 +12,7 @@ Bot de Discord para las actividades de la comunidad: cumpleaños, organización 
 | `copypastas`  | Disponible      | Copia al canal de copypastas los mensajes marcados con un emoji y los deja votar |
 | `tagrole`     | Disponible      | Da un rol a quien muestra la etiqueta del servidor y se lo quita si la deja      |
 | `debug`       | Solo desarrollo | Comandos de prueba; todos usan el prefijo `lc-debug-`                            |
+| `lepocracia`  | Planeado        | Votación de la comunidad para aplicar acciones temporales a un miembro           |
 | `tournaments` | Planeado        | Torneos internos de LoL                                                          |
 
 ### Cumpleaños
@@ -321,6 +322,7 @@ Al importar, se usa el espacio de nombres cuando se consume más de una función
 ## Hoja de ruta
 
 - [ ] **Torneos internos de LoL**: inscripción, armado de equipos o brackets y seguimiento de resultados
+- [ ] **Lepocracia (`lepocracia`)**: votar acciones temporales contra un miembro —cambiarle el apodo, silenciarlo o banearlo por un rato— para que la decisión no recaiga en un solo moderador ni parezca una vendetta personal. Si la votación se abre en una llamada de voz, el mínimo para aprobar es la mitad más uno de los presentes.
 - [ ] Saludos de cumpleaños perdidos: recuperar el saludo si el bot estuvo caído a las 9:00
 
 ## Despliegue
